@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+html, body { background: #FAF9F6; color: #262624; }
+body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid #D97757; outline-offset: 2px; border-radius: 6px; }
+@keyframes shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
+.skeleton { background: linear-gradient(90deg,#F0EFEB 25%,#E8E6E1 50%,#F0EFEB 75%); background-size: 800px 100%; animation: shimmer 1.4s infinite linear; }
