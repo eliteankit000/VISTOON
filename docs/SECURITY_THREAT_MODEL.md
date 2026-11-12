@@ -1,0 +1,17 @@
+# Threat model (working draft)
+
+| Threat | Control | Status |
+|---|---|---|
+| Cross-tenant read/write (IDOR/BOLA) | RLS on all tables, owner-scoped queries, 404 for foreign ids | VERIFIED on real DB (40 checks) |
+| Privilege escalation to admin | Role column not user-writable; admin needs role + MFA (aal2) in DB and API | VERIFIED (DB); UI flow not exercised |
+| Forged asset rows / quota bypass | Users cannot write assets; owner-prefix CHECK; quota triggers with advisory locks | VERIFIED on real DB |
+| Malicious upload (renamed exe, HTML, SVG) | Type allow-list, size caps, server-side signature sniffing, no SVG/HTML | Rules VERIFIED (unit); live upload TESTING |
+| Path traversal via filename | Keys are server-generated UUIDs; names are display-only and sanitised | VERIFIED (unit) |
+| CSRF on cookie-auth mutations | Origin must match host; SameSite cookies | Unit VERIFIED; live TESTING |
+| Open redirect after login | `safeRedirect` allows only same-site paths | VERIFIED (unit) |
+| Account enumeration | Generic login/signup/reset responses | IMPLEMENTED |
+| Service key leak | `server-only` import guard; not in client bundle | VERIFIED (bundle scan, Day 4) |
+| Private data via storage API | Bucket private, no storage policies for clients | VERIFIED on real DB |
+| Brute force / abuse | Supabase Auth limits only. **App rate limiting not yet built** | NOT_STARTED (Day 27-28) |
+| Malware in uploads | No scanner yet | NOT_STARTED |
+| Rendering-worker abuse | Own compositions only, isolated worker | NOT_STARTED (Day 21-25) |

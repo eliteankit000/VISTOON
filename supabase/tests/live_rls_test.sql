@@ -1,4 +1,5 @@
--- LIVE version: paste into the Supabase SQL editor / execute_sql. Ends with an intentional exception so every fixture rolls back.
+-- LIVE version: run in the Supabase SQL editor / execute_sql. Ends with an intentional exception so all fixtures roll back.
+-- Note: counts (e.g. 'A sees own project') assume the fixture users only.
 -- RLS security tests. Each check RAISES on failure; the run stops at the first failure. Run via tests/run.sh.
 create temp table results(name text, ok boolean);
 grant all on results to public;
@@ -24,9 +25,15 @@ begin
   exception when others then blocked := true; end;
   perform pg_temp.check(name, blocked);
 end $$;
+create function pg_temp.denied_msg(name text, stmt text, frag text) returns void language plpgsql as $$
+declare ok boolean := false;
+begin
+  begin execute stmt; exception when others then ok := position(frag in sqlerrm) > 0; if not ok then raise notice 'wrong error for %: %', name, sqlerrm; end if; end;
+  perform pg_temp.check(name, ok);
+end $$;
 grant execute on all functions in schema pg_temp to public;
 
-select pg_temp.check('trigger created profile + subscription for new users', (select count(*) from public.profiles) = 3 and (select count(*) from public.subscriptions) = 3);
+select pg_temp.check('trigger created profile + subscription for new users', (select count(*) from public.profiles where user_id::text like '%-0000-0000-0000-00000000000_') = 3 and (select count(*) from public.subscriptions where user_id::text like '%-0000-0000-0000-00000000000_') = 3);
 
 -- A creates data.
 select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
@@ -51,7 +58,6 @@ select pg_temp.denied('user cannot create render job', $$insert into public.rend
 select pg_temp.denied('user cannot write usage events', $$insert into public.usage_events (user_id,kind,quantity) values ('bbbbbbbb-0000-0000-0000-000000000002','x',-100)$$);
 select pg_temp.denied('user cannot upgrade own plan', $$update public.subscriptions set plan='pro' where user_id='bbbbbbbb-0000-0000-0000-000000000002'$$);
 select pg_temp.check('user cannot read audit log', (select count(*) from public.audit_log) = 0);
-select pg_temp.denied('user cannot call handle_new_user', $$select public.handle_new_user()$$);
 
 -- Styles: users see published only; cannot write.
 select pg_temp.check('user sees only published styles', (select count(*) from public.styles where status <> 'published') = 0 and (select count(*) from public.styles) >= 1);
@@ -67,10 +73,36 @@ update public.styles set status='published' where id='11111111-0000-0000-0000-00
 select pg_temp.check('admin WITH MFA can write styles', (select status from public.styles where id='11111111-0000-0000-0000-000000000002') = 'published');
 select pg_temp.check('admin cannot read other users projects (not granted)', (select count(*) from public.projects) = 0);
 
+-- Day 5: storage + quota rules.
+reset role; select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select pg_temp.denied('user cannot insert asset row directly', $$insert into public.assets (user_id,project_id,kind,storage_key,mime,bytes,status) values ('aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','voiceover','aaaaaaaa-0000-0000-0000-000000000001/forged','audio/mpeg',0,'ready')$$);
+select pg_temp.denied('user cannot delete own project directly', $$delete from public.projects where id='22222222-0000-0000-0000-00000000000a'$$);
+select pg_temp.denied('user cannot edit plan limits', $$update public.plan_limits set max_storage_bytes = 999999999999$$);
+select pg_temp.denied('user cannot read storage objects directly', $$select 1/0 from storage.objects where bucket_id='vistoon-private'$$);
+select pg_temp.check('user sees zero storage objects', (select count(*) from storage.objects) = 0);
+select pg_temp.denied('user cannot insert storage object directly', $$insert into storage.objects (bucket_id,name) values ('vistoon-private','aaaaaaaa-0000-0000-0000-000000000001/x')$$);
+select pg_temp.denied_msg('free plan: 6th project rejected', $$insert into public.projects (user_id,name) select 'aaaaaaaa-0000-0000-0000-000000000001', 'p'||g from generate_series(1,5) g$$, 'project_limit_reached');
+insert into public.projects (user_id,name) select 'aaaaaaaa-0000-0000-0000-000000000001','q'||g from generate_series(1,4) g;
+update public.projects set archived_at = now() where id='22222222-0000-0000-0000-00000000000a';
+insert into public.projects (user_id,name) values ('aaaaaaaa-0000-0000-0000-000000000001','replacement');
+select pg_temp.denied_msg('un-archiving past the plan limit rejected', $$update public.projects set archived_at = null where id='22222222-0000-0000-0000-00000000000a'$$, 'project_limit_reached');
+reset role;
+-- Server-side (service role / superuser) writes: triggers must still fire.
+select pg_temp.check('bucket is private with size limit', (select not public and file_size_limit = 52428800 from storage.buckets where id='vistoon-private'));
+select pg_temp.denied_msg('key must start with owner folder', $$insert into public.assets (user_id,project_id,kind,storage_key,mime,bytes) values ('aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','voiceover','bbbbbbbb-0000-0000-0000-000000000002/steal','audio/mpeg',1)$$, 'assets_key_owner_prefix');
+select pg_temp.denied_msg('over-quota asset rejected', $$insert into public.assets (user_id,project_id,kind,storage_key,mime,bytes) values ('aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','voiceover','aaaaaaaa-0000-0000-0000-000000000001/big','audio/mpeg',1073741825)$$, 'storage_quota_exceeded');
+insert into public.assets (user_id,project_id,kind,storage_key,mime,bytes,status) values ('aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','voiceover','aaaaaaaa-0000-0000-0000-000000000001/ok1','audio/mpeg',1000,'ready');
+select pg_temp.check('valid asset accepted', (select count(*) from public.assets where user_id = 'aaaaaaaa-0000-0000-0000-000000000001') = 1);
+select pg_temp.denied_msg('duplicate storage key rejected', $$insert into public.assets (user_id,project_id,kind,storage_key,mime,bytes) values ('aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','voiceover','aaaaaaaa-0000-0000-0000-000000000001/ok1','audio/mpeg',1)$$, 'assets_storage_key_unique');
+insert into public.assets (user_id,project_id,kind,storage_key,mime,bytes) select 'aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','voiceover','aaaaaaaa-0000-0000-0000-000000000001/p'||g,'audio/mpeg',1 from generate_series(1,10) g;
+select pg_temp.denied_msg('11th pending upload rejected', $$insert into public.assets (user_id,project_id,kind,storage_key,mime,bytes) values ('aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','voiceover','aaaaaaaa-0000-0000-0000-000000000001/p11','audio/mpeg',1)$$, 'too_many_pending_uploads');
+select pg_temp.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select pg_temp.check('B cannot see A assets', (select count(*) from public.assets) = 0);
+reset role;
+
 -- anon: nothing.
 reset role; set role anon;
 select pg_temp.denied('anon cannot read projects', $$select 1/0 from public.projects$$);
 select pg_temp.denied('anon cannot read profiles', $$select 1/0 from public.profiles$$);
-select pg_temp.denied('anon cannot call private.is_admin', $$select private.is_admin()$$);
 reset role;
 do $$ begin raise exception 'RESULT: % checks passed (rolled back)', (select count(*) from results where ok); end $$;

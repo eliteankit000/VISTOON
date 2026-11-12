@@ -1,40 +1,36 @@
-"use client";
 import Link from "next/link";
-import { useState } from "react";
-import { Card, Badge, PageHeader, MockBanner, Button, Dialog, Field, Input, Select, useToast } from "@/components/ui";
-import { projects } from "@/lib/mock";
+import { Card, Badge, PageHeader, EmptyState } from "@/components/ui";
+import { requireUser } from "@/lib/auth/guards";
+import { NewProjectButton } from "./NewProjectButton";
 
-export default function Projects() {
-  const [open, setOpen] = useState(false);
-  const toast = useToast();
+export default async function Projects() {
+  const { supabase } = await requireUser();
+  const { data: projects } = await supabase.from("projects")
+    .select("id, name, format, language, ratio, archived_at, updated_at").order("updated_at", { ascending: false });
+  const rows = projects ?? [];
   return (
     <>
-      <PageHeader title="Projects" desc="Each project holds scripts, assets, styles and renders."
-        actions={<Button onClick={() => setOpen(true)}>New project</Button>} />
-      <MockBanner />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {projects.map((p) => (
-          <Link key={p.id} href={`/projects/${p.id}`}>
-            <Card className="p-5 transition-colors hover:bg-hover">
-              <div className="mb-3 flex aspect-video items-center justify-center rounded bg-sidebar text-xs text-muted">No thumbnail</div>
-              <p className="text-sm font-medium">{p.name}</p>
-              <div className="mt-2 flex flex-wrap gap-1.5"><Badge>{p.format}</Badge><Badge>{p.language}</Badge><Badge>{p.ratio}</Badge></div>
-              <p className="mt-2 text-xs text-muted">{p.updated}</p>
-            </Card>
-          </Link>
-        ))}
-      </div>
-      <Dialog open={open} onClose={() => setOpen(false)} title="New project">
-        <div className="space-y-3">
-          <Field label="Name"><Input placeholder="Project name" /></Field>
-          <Field label="Format"><Select><option>Shorts</option><option>Long-form</option></Select></Field>
-          <Field label="Language"><Select><option>English</option><option>Hinglish (Roman)</option><option>Hindi (Devanagari)</option></Select></Field>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={() => { setOpen(false); toast("Preview only: project was not saved", "neutral"); }}>Create</Button>
-          </div>
+      <PageHeader title="Projects" desc="Each project holds scripts, assets, styles and renders." actions={<NewProjectButton />} />
+      {rows.length === 0 ? (
+        <Card><EmptyState title="No projects yet" desc="Create your first project to start adding scripts and files." action={<NewProjectButton />} /></Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {rows.map((p) => (
+            <Link key={p.id} href={`/projects/${p.id}`}>
+              <Card className="p-5 transition-colors hover:bg-hover">
+                <p className="truncate text-sm font-medium">{p.name}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {p.format && <Badge>{p.format === "shorts" ? "Shorts" : "Long-form"}</Badge>}
+                  {p.language && <Badge>{{ en: "English", hinglish: "Hinglish", hi: "Hindi" }[p.language as "en" | "hinglish" | "hi"]}</Badge>}
+                  {p.ratio && <Badge>{p.ratio}</Badge>}
+                  {p.archived_at && <Badge tone="warn">Archived</Badge>}
+                </div>
+                <p className="mt-2 text-xs text-muted">Updated {new Date(p.updated_at).toLocaleDateString()}</p>
+              </Card>
+            </Link>
+          ))}
         </div>
-      </Dialog>
+      )}
     </>
   );
 }

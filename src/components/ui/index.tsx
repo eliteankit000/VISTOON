@@ -183,3 +183,19 @@ export function PageHeader({ title, desc, actions, crumbs }: { title: string; de
     </div>
   );
 }
+
+export function ConfirmDialog({ open, onClose, onConfirm, title, body, confirmLabel = "Delete", loading }:
+  { open: boolean; onClose: () => void; onConfirm: () => void; title: string; body: string; confirmLabel?: string; loading?: boolean }) {
+  return (
+    <Dialog open={open} onClose={onClose} title={title}>
+      <p className="text-sm text-muted">{body}</p>
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button variant="danger" onClick={onConfirm} loading={loading}>{confirmLabel}</Button>
+      </div>
+    </Dialog>
+  );
+}
+
+export const formatBytes = (n: number) =>
+  n < 1024 ? `${n} B` : n < 1024 ** 2 ? `${(n / 1024).toFixed(1)} KB` : n < 1024 ** 3 ? `${(n / 1024 ** 2).toFixed(1)} MB` : `${(n / 1024 ** 3).toFixed(2)} GB`;

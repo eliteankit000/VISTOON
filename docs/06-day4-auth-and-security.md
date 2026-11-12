@@ -44,3 +44,7 @@
   the real aal2 token). This sandbox's network blocks `*.supabase.co`. Test these from your machine (steps in README).
 - Dashboard settings no tool here can change (do by hand): require email confirmation, minimum password length 12,
   enable TOTP MFA, Site URL + redirect URL `<domain>/auth/callback`.
+
+## UPDATE 2026-11-13: Day 5 database
+- Migrations 0004 and 0005 applied to the real project. `live_rls_test.sql` is the full suite (40 checks passed on 0004).
+- Note: the Supabase tool asked for confirmation on 0004 (it drops a policy and revokes grants) and timed out once; the retry was approved.

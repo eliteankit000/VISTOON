@@ -1,20 +1,20 @@
-import Link from "next/link";
-import { Card, CardHeader, Badge, PageHeader, MockBanner } from "@/components/ui";
-import { projects } from "@/lib/mock";
+import { notFound } from "next/navigation";
+import { PageHeader } from "@/components/ui";
+import { requireUser } from "@/lib/auth/guards";
+import { Workspace } from "./Workspace";
 
 export default async function ProjectDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const p = projects.find((x) => x.id === id) ?? projects[0]!;
+  const { supabase } = await requireUser();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
+  const { data: project } = await supabase.from("projects").select("id, name, format, language, ratio, archived_at").eq("id", id).maybeSingle();
+  if (!project) notFound(); // RLS hides other users' projects: indistinguishable from "does not exist"
+  const { data: assets } = await supabase.from("assets")
+    .select("id, kind, original_name, mime, bytes, status, archived_at, created_at").eq("project_id", id).order("created_at", { ascending: false });
   return (
     <>
-      <PageHeader crumbs={["Projects", p.name]} title={p.name} desc={`${p.format} · ${p.language} · ${p.ratio}`} />
-      <MockBanner />
-      <div className="grid gap-4 md:grid-cols-2">
-        {[["Script", "/script-studio", "Draft v3 · not yet validated"], ["Voiceover & references", "/reference-studio", "No assets uploaded"],
-          ["Style", "/animation-library", "No style selected"], ["Video & renders", "/video-studio", "No render yet"]].map(([t, href, s]) => (
-          <Link key={t} href={href!}><Card><CardHeader title={t!} action={<Badge>{p.status}</Badge>} /><p className="px-5 py-4 text-sm text-muted">{s}</p></Card></Link>
-        ))}
-      </div>
+      <PageHeader crumbs={["Projects", project.name]} title={project.name} />
+      <Workspace project={project} assets={assets ?? []} />
     </>
   );
 }
