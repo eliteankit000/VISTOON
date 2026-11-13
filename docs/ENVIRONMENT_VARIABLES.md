@@ -10,3 +10,6 @@
 | `WORKER_PORT` / `WORKER_HOST` | worker | Health server (`/healthz`, `/readyz`); default 8080 on 127.0.0.1 |
 | `WORKER_ID` | worker | Identifier shown in `worker_status` heartbeats |
 | `LOG_LEVEL` | server + worker | pino level; secrets are redacted |
+| `ANTHROPIC_API_KEY` | **server only** | Script generation. Never `NEXT_PUBLIC_`, never logged; without it the API returns 503 |
+| `ANTHROPIC_MODEL` | server | Defaults to `claude-sonnet-5-5` |
+| `LLM_TIMEOUT_MS` | server | Per-call timeout, clamped to 5–120 s (default 60 s) |

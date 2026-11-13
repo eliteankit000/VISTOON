@@ -22,3 +22,7 @@
 - `npm run test:rls`: 75 checks pass. Live (rolled back): 8 checks pass. `npm test` 71 pass, build clean.
 - Signed-out probes: new admin APIs 401, pages 307. Cross-origin PATCH is rejected (401 from auth before the 403 CSRF check).
 - Not tested: admin pages signed in with an MFA session.
+
+## Day 8 (2026-11-13)
+- `npm test`: 102 pass (31 new LLM/count/prompt tests). `npm run test:rls`: 81 checks. Live quota checks (rolled back): 4 pass.
+- Not tested: real provider call, signed-in generate/save, UI in a browser.

@@ -37,3 +37,13 @@
 | `script_generation` switch | IMPLEMENTED | stored; enforced when Script Studio (Day 8+) exists |
 | Admin APIs and pages | IMPLEMENTED | build ok; signed-out probes 401/307; not exercised signed in with MFA |
 | Reauthentication for sensitive actions | NOT_STARTED | |
+
+## Day 8 — LLM adapter and script generation
+| Item | Status | Evidence |
+|---|---|---|
+| Provider interface, Anthropic adapter, retry | VERIFIED (against fake fetch) | 31 unit tests in tests/llm.test.ts |
+| Prompt template + injection fencing | VERIFIED (unit) | tests; not evaluated against a live model |
+| Generation quota (atomic, 24h) + kill switch | VERIFIED (DB) | 6 new local checks (81 total), live checks (rolled back) |
+| Generate/list API | IMPLEMENTED | typechecks, builds; signed-out 401; never run with a real key or signed in |
+| Script Studio UI | IMPLEMENTED | not exercised in a browser |
+| Real Anthropic call | NOT_STARTED | needs ANTHROPIC_API_KEY |

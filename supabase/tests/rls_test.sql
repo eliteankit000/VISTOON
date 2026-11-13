@@ -181,4 +181,24 @@ reset role; set role anon;
 select pg_temp.denied('anon cannot read switches', $$select 1/0 from public.kill_switches$$);
 reset role;
 
+-- Day 8: generation quota.
+set role service_role;
+update public.plan_limits set generations_per_day = 2 where plan = 'free';
+select public.reserve_script_generation('aaaaaaaa-0000-0000-0000-000000000001');
+select public.reserve_script_generation('aaaaaaaa-0000-0000-0000-000000000001');
+select pg_temp.denied_msg('third generation in 24h is refused at the cap', $$select public.reserve_script_generation('aaaaaaaa-0000-0000-0000-000000000001')$$, 'generation_limit_reached');
+select pg_temp.check('another user has their own allowance', (select public.reserve_script_generation('bbbbbbbb-0000-0000-0000-000000000002')) is not null);
+select pg_temp.denied_msg('unknown user rejected', $$select public.reserve_script_generation('99999999-0000-0000-0000-000000000009')$$, 'user_not_found');
+reset role;
+update public.usage_events set at = now() - interval '25 hours' where user_id='aaaaaaaa-0000-0000-0000-000000000001' and kind='script_generation';
+set role service_role;
+select pg_temp.check('old reservations stop counting after 24h', (select public.reserve_script_generation('aaaaaaaa-0000-0000-0000-000000000001')) is not null);
+select public.admin_set_switch('cccccccc-0000-0000-0000-000000000003','script_generation',true,'drill');
+select pg_temp.denied_msg('kill switch blocks generation', $$select public.reserve_script_generation('bbbbbbbb-0000-0000-0000-000000000002')$$, 'script_generation_disabled');
+select public.admin_set_switch('cccccccc-0000-0000-0000-000000000003','script_generation',false,null);
+reset role;
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select pg_temp.denied('user cannot call reserve_script_generation', $$select public.reserve_script_generation('aaaaaaaa-0000-0000-0000-000000000001')$$);
+reset role;
+
 select count(*) || ' checks passed' as summary from results where ok;

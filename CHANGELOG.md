@@ -21,3 +21,10 @@
 - Migration 0007: `kill_switches` (uploads, rendering, script_generation), `feature_flags`, `admin_set_role/_switch/_flag` (service role only, audited atomically), append-only `audit_log` (update/delete/truncate blocked for everyone).
 - DB-enforced kill switches on `assets` and `render_jobs` inserts.
 - APIs `/api/admin/{users,controls,audit}`; pages `/admin/users`, `/admin/controls`, `/admin/audit`.
+
+## Day 8 — LLM adapter and script generation
+- Provider-agnostic `LlmProvider` + Anthropic adapter (fetch, timeout, error mapping, Retry-After), bounded retries with backoff.
+- Versioned prompt template `script.v1`; brief fenced as data; strict brief schema.
+- Server-side word counter policy `words-v1`.
+- Migration 0008: `plan_limits.generations_per_day` + `reserve_script_generation` (atomic daily cap, kill switch aware).
+- `POST/GET /api/projects/[id]/scripts`; Script Studio wired to real projects and versions.

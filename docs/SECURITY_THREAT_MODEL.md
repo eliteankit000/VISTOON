@@ -25,3 +25,8 @@
 - Privilege escalation: roles change only via service-role RPC that re-checks the actor is admin; self-change blocked; audited.
 - Incident response: kill switches act in the DB, so they stop uploads/renders regardless of code path.
 - Audit tampering: append-only triggers (a superuser/DB owner could still drop them; mitigated by external log shipping later).
+
+## Day 8 additions
+- Cost abuse: quota reserved in the DB before the LLM call (atomic per user), released on provider failure; kill switch stops it instantly.
+- Prompt injection: brief is fenced as data with tag characters stripped; output is plain text rendered as text and never executed. Residual risk: model can still be steered inside the script text (low impact).
+- Key exposure: key read server-side only; tests confirm it is absent from request bodies and error messages.
