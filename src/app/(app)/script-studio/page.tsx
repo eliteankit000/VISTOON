@@ -2,10 +2,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { countBy, type CountType } from "@/lib/scripts/count";
-import { Badge, Button, Card, CardHeader, EmptyState, Field, Input, PageHeader, Select, Skeleton, Textarea, useToast } from "@/components/ui";
+import type { Quality } from "@/lib/scripts/quality";
+import { Badge, Button, Progress, Card, CardHeader, EmptyState, Field, Input, PageHeader, Select, Skeleton, Textarea, useToast } from "@/components/ui";
 
 type Project = { id: string; name: string; archived_at: string | null };
-type Version = { id: string; body: string; kind: "generated" | "edit" | "autosave"; actual_count: number | null; counter_policy: string; created_at: string; updated_at: string };
+type Version = { id: string; body: string; kind: "generated" | "edit" | "autosave" | "revision"; revision_round: number; scores: { quality?: Quality } | null; actual_count: number | null; counter_policy: string; created_at: string; updated_at: string };
 type Save = "idle" | "dirty" | "saving" | "saved" | "error";
 
 export default function ScriptStudio() {
@@ -20,6 +21,12 @@ export default function ScriptStudio() {
   const [tType, setTType] = React.useState<CountType>("words");
   const [tCount, setTCount] = React.useState("");
   const loaded = React.useRef(false);
+  const area = React.useRef<HTMLTextAreaElement>(null);
+  const [selId, setSelId] = React.useState<string | null>(null);
+  const [selText, setSelText] = React.useState("");
+  const [quality, setQuality] = React.useState<Quality | null>(null);
+  const [busyOp, setBusyOp] = React.useState<null | "score" | "revise" | "rewrite">(null);
+  const [instr, setInstr] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
   const [f, setF] = React.useState({ topic: "", niche: "", audience: "", format: "shorts", language: "en", tone: "" });
@@ -36,7 +43,7 @@ export default function ScriptStudio() {
 
   React.useEffect(() => {
     if (!projectId) return;
-    loaded.current = false; setText(""); setVersions([]); setSave("idle"); setFitMsg(null);
+    loaded.current = false; setSelId(null); setQuality(null); setText(""); setVersions([]); setSave("idle"); setFitMsg(null);
     void (async () => {
       const r = await fetch(`/api/projects/${projectId}/scripts`);
       if (r.ok) {
@@ -44,7 +51,9 @@ export default function ScriptStudio() {
         const history = v.filter((x) => x.kind !== "autosave");
         setVersions(history);
         const draft = v.find((x) => x.kind === "autosave");
-        setText(draft && (!history[0] || draft.updated_at > history[0].created_at) ? draft.body : history[0]?.body ?? "");
+        const useDraft = !!draft && (!history[0] || draft.updated_at > history[0].created_at);
+        setText(useDraft ? draft!.body : history[0]?.body ?? "");
+        if (!useDraft && history[0]) { setSelId(history[0].id); setSelText(history[0].body); setQuality(history[0].scores?.quality ?? null); }
       }
       loaded.current = true;
     })();
@@ -61,6 +70,38 @@ export default function ScriptStudio() {
     return () => clearTimeout(t);
   }, [text, save, projectId]);
 
+  const pick = (v: Version, setBody = true) => { if (setBody) { setText(v.body); setSave("dirty"); } setSelId(v.id); setSelText(v.body); setQuality(v.scores?.quality ?? null); setFitMsg(null); };
+  const dirty = text !== selText;
+  const post = async (path: string, body: unknown) => {
+    const r = await fetch(`/api/projects/${projectId}/scripts/${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    return { ok: r.ok, j: await r.json().catch(() => ({})) };
+  };
+  async function score() {
+    setBusyOp("score");
+    const { ok, j } = await post("score", { text, ...(selId && !dirty ? { versionId: selId } : {}) });
+    setBusyOp(null);
+    if (!ok) { toast(j.error ?? "Could not score", "danger"); return; }
+    setQuality(j.quality);
+    if (selId && !dirty) setVersions((vs) => vs.map((v) => (v.id === selId ? { ...v, scores: { ...(v.scores ?? {}), quality: j.quality } } : v)));
+  }
+  async function revise() {
+    if (!selId) return;
+    setBusyOp("revise");
+    const { ok, j } = await post("revise", { versionId: selId });
+    setBusyOp(null);
+    if (!ok) { toast(j.error ?? "Could not revise", "danger"); return; }
+    setVersions((vs) => [j.version, ...vs]); setText(j.version.body); setSave("idle"); pick(j.version, false);
+    toast(`Revision ${j.version.revision_round}/3: ${j.previousTotal} → ${j.version.scores?.quality?.total ?? "?"}${j.improved ? "" : " (no improvement; you can keep the earlier version)"}`, j.improved ? "success" : "neutral");
+  }
+  async function rewrite() {
+    const el = area.current; if (!el) return;
+    const a = el.selectionStart, b = el.selectionEnd;
+    setBusyOp("rewrite");
+    const { ok, j } = await post("rewrite", { text, start: a, end: b, instruction: instr });
+    setBusyOp(null);
+    if (!ok) { toast(j.error ?? "Could not rewrite", "danger"); return; }
+    edit(j.text); setInstr(""); toast("Selection rewritten. Review it, then save a version.", "success");
+  }
   const edit = (v: string) => { setText(v); setSave("dirty"); setFitMsg(null); };
   const target = Number(tCount);
   const hasTarget = Number.isInteger(target) && target >= 20 && target <= (tType === "words" ? 3000 : 60000);
@@ -73,7 +114,7 @@ export default function ScriptStudio() {
     const r = await fetch(`/api/projects/${projectId}/scripts/versions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { toast(j.error ?? "Could not save", "danger"); return; }
-    setVersions((v) => [j.version, ...v]); toast(`Version saved (${j.version.actual_count} ${j.version.count_type} by the server)`, "success");
+    setVersions((v) => [j.version, ...v]); pick(j.version, false); toast(`Version saved (${j.version.actual_count} ${j.version.count_type} by the server)`, "success");
   }
 
   async function fit() {
@@ -96,7 +137,7 @@ export default function ScriptStudio() {
     const j = await r.json().catch(() => ({}));
     setBusy(false);
     if (!r.ok) { toast(j.error ?? "Generation failed", "danger"); return; }
-    setVersions((v) => [j.version, ...v]); setText(j.version.body); setSave("idle");
+    setVersions((v) => [j.version, ...v]); setText(j.version.body); setSave("idle"); pick(j.version, false);
     toast(j.lengthExact === false ? "Saved, but the exact length was not reached. Use Adjust to try again." : "Script saved as a new version", j.lengthExact === false ? "neutral" : "success");
   }
 
@@ -136,7 +177,7 @@ export default function ScriptStudio() {
                 {hasTarget && <Badge tone={delta === 0 ? "success" : "warn"}>{delta === 0 ? "Exact" : delta > 0 ? `${delta} over` : `${-delta} under`}</Badge>}
               </span>} />
             <div className="space-y-3 p-5">
-              <Textarea rows={14} maxLength={60000} value={text} onChange={(e) => edit(e.target.value)} placeholder="Generate a script, or write one here…" aria-label="Script text" />
+              <Textarea ref={area} rows={14} maxLength={60000} value={text} onChange={(e) => edit(e.target.value)} placeholder="Generate a script, or write one here…" aria-label="Script text" />
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-muted" aria-live="polite">{{ idle: "", dirty: "Unsaved changes…", saving: "Saving draft…", saved: "Draft saved", error: "Autosave failed. Your text is still here; use Save version." }[save]}</span>
                 <span className="flex gap-2">
@@ -145,6 +186,37 @@ export default function ScriptStudio() {
                 </span>
               </div>
               {fitMsg && <p className="text-sm text-muted">{fitMsg}</p>}
+              <div className="flex flex-wrap items-end gap-2 border-t border-line pt-3">
+                <div className="min-w-[200px] flex-1"><Field label="Rewrite selected text" hint="Select 5–3000 characters above"><Input value={instr} maxLength={200} onChange={(e) => setInstr(e.target.value)} placeholder="e.g. make it punchier" /></Field></div>
+                <Button variant="secondary" loading={busyOp === "rewrite"} disabled={instr.trim().length < 3} onClick={rewrite}>Rewrite selection</Button>
+              </div>
+              {selId && <p className="flex gap-3 text-xs text-muted"><span>Export saved version:</span>{(["txt", "md", "json"] as const).map((x) => <a key={x} className="underline" href={`/api/projects/${projectId}/scripts/export?versionId=${selId}&format=${x}`}>{x}</a>)}</p>}
+            </div>
+          </Card>
+          <Card>
+            <CardHeader title="Quality score" desc="An editorial estimate against a rubric. It does not predict views or virality."
+              action={<span className="flex items-center gap-2">
+                {quality && <Badge tone={quality.pass ? "success" : "warn"}>{quality.total}/100{quality.pass ? " · passes" : ` · target ${quality.target}`}</Badge>}
+                <Button size="sm" variant="secondary" loading={busyOp === "score"} disabled={text.trim().length < 20} onClick={score}>{quality ? "Re-score" : "Score"}</Button>
+                <Button size="sm" loading={busyOp === "revise"} disabled={!selId || dirty || !!quality?.pass} onClick={revise}>Improve</Button>
+              </span>} />
+            <div className="p-5">
+              {dirty && selId && <p className="mb-3 text-xs text-muted">You have unsaved edits. Save a version to enable Improve; scoring will use the text above.</p>}
+              {!quality ? <EmptyState title="Not scored yet" desc="Click Score to get a rated breakdown with reasons." /> : (
+                <div className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {quality.dimensions.map((d) => (
+                      <div key={d.key}>
+                        <div className="mb-1 flex justify-between text-xs"><span>{d.label} <span className="text-muted">(weight {d.weight})</span></span><span className="text-muted">{d.score}/10</span></div>
+                        <Progress value={d.score * 10} />
+                        <p className="mt-1 text-xs text-muted">{d.reason}</p>
+                        {d.evidence && <p className="mt-1 border-l-2 border-line pl-2 text-xs italic">“{d.evidence}”</p>}
+                        {d.score < 9 && <p className="mt-1 text-xs">Try: {d.suggestion}</p>}
+                      </div>))}
+                  </div>
+                  {quality.factualFlags.length > 0 && <div className="rounded border border-line p-3"><p className="text-sm font-medium">Check these claims</p><ul className="mt-1 list-disc pl-5 text-xs text-muted">{quality.factualFlags.map((f, i) => <li key={i}>“{f.quote}” — {f.concern}</li>)}</ul></div>}
+                  <p className="text-xs text-muted">Measured by code: {quality.metrics.words} words, {quality.metrics.sentences} sentences, average {quality.metrics.avgSentenceWords} words per sentence, longest {quality.metrics.longestSentenceWords}, vocabulary variety {quality.metrics.uniqueWordRatio}. {quality.disclaimer}</p>
+                </div>)}
             </div>
           </Card>
           {versions.length > 0 && (
@@ -152,8 +224,8 @@ export default function ScriptStudio() {
               <CardHeader title="Version history" />
               <ul className="divide-y divide-line">
                 {versions.map((v) => (
-                  <li key={v.id}><button className="flex w-full items-center justify-between px-5 py-3 text-left text-sm hover:bg-hover" onClick={() => { setText(v.body); setSave("dirty"); setFitMsg(null); }}>
-                    <span className="truncate">{v.body.slice(0, 70)}…</span><span className="ml-3 shrink-0 text-xs text-muted">{v.kind} · {v.actual_count} · {new Date(v.created_at).toLocaleString()}</span>
+                  <li key={v.id}><button className="flex w-full items-center justify-between px-5 py-3 text-left text-sm hover:bg-hover" onClick={() => pick(v)}>
+                    <span className="truncate">{v.body.slice(0, 70)}…</span><span className="ml-3 shrink-0 text-xs text-muted">{v.kind}{v.revision_round ? ` ${v.revision_round}/3` : ""}{v.scores?.quality ? ` · ${v.scores.quality.total}/100` : ""} · {v.actual_count} · {new Date(v.created_at).toLocaleString()}</span>
                   </button></li>))}
               </ul>
             </Card>

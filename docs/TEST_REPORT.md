@@ -30,3 +30,7 @@
 ## Day 9 (2026-11-13)
 - Unit tests and RLS checks (91) pass; live script_versions constraint checks (rolled back) pass.
 - Not tested: real model obeying length corrections, UI in a browser, signed-in API calls.
+
+## Day 10 (2026-11-13)
+- Unit + RLS: all pass (see totals below in final run); live revision constraint checks (rolled back) pass.
+- Not tested: real model scoring quality/consistency, UI in a browser, signed-in API calls, file download in a browser.

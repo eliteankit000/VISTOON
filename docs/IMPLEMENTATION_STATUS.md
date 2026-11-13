@@ -58,3 +58,13 @@
 | Editor UI | IMPLEMENTED | not exercised in a browser |
 | Section rewrite, export | NOT_STARTED | Day 10 |
 | Known limit | | grapheme counts depend on runtime ICU; server count authoritative. Version-cap trigger is not race-proof under concurrent inserts (can exceed 200 slightly) |
+
+## Day 10 — Quality scoring and revision
+| Item | Status | Evidence |
+|---|---|---|
+| Rubric, deterministic total, evidence verification, flags, metrics | VERIFIED (unit, fake LLM) | tests/quality.test.ts (20) |
+| Revision limit (3) | VERIFIED (DB + API logic) | 5 new local checks (96 total), 2 live (rolled back) |
+| Section rewrite confined to selection | VERIFIED (unit) | tests |
+| Export (txt/md/json, safe filenames/headers) | VERIFIED (unit) | tests; download not exercised in a browser |
+| score/revise/rewrite/export APIs and UI | IMPLEMENTED | typecheck/build/401 probes; never run signed in or with a real model |
+| Known limits | | Hand-edit + save starts a fresh revision chain (quota is the real brake). A revise call costs 2 quota slots but can make up to ~7 model calls. Scores are model opinions; real-model calibration not done |

@@ -35,3 +35,8 @@
 - Storage/DoS via versions: DB caps (60k chars, 200 versions); autosave overwrites a single row.
 - Cost: correction rounds can make up to 4 model calls per reserved quota slot (bounded, documented).
 - Tampered counts: counts are recomputed server-side on every save; client numbers are never stored.
+
+## Day 10 additions
+- Score gaming/prompt injection: script is fenced as data; total computed in code; fabricated evidence is discarded.
+- Download attacks: sanitized filename, `nosniff`, attachment, `private, no-store`; text types only.
+- Cost: revision/score/rewrite reserve quota slots before calling the model and release them on failure.

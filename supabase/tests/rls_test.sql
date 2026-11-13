@@ -219,4 +219,23 @@ select pg_temp.denied('other user cannot add a version to my script', $$insert i
 reset role;
 select pg_temp.check('no versions were altered by the other user', (select count(*) from public.script_versions where body='pwned') = 0);
 
+-- Day 10: revision chain.
+reset role;
+delete from public.script_versions where script_id='33333333-0000-0000-0000-00000000000a' and kind in ('edit','autosave');
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+insert into public.script_versions (id, user_id, script_id, body, kind) values ('88888888-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','base','edit');
+insert into public.script_versions (id, user_id, script_id, body, kind, parent_id, revision_round) values ('88888888-0000-0000-0000-000000000002','aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','r1','revision','88888888-0000-0000-0000-000000000001',1);
+insert into public.script_versions (id, user_id, script_id, body, kind, parent_id, revision_round) values ('88888888-0000-0000-0000-000000000003','aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','r2','revision','88888888-0000-0000-0000-000000000002',2);
+insert into public.script_versions (id, user_id, script_id, body, kind, parent_id, revision_round) values ('88888888-0000-0000-0000-000000000004','aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','r3','revision','88888888-0000-0000-0000-000000000003',3);
+select pg_temp.denied_msg('a 4th revision round is impossible', $$insert into public.script_versions (user_id, script_id, body, kind, parent_id, revision_round) values ('aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','r4','revision','88888888-0000-0000-0000-000000000004',4)$$, 'revision_round_check');
+select pg_temp.denied_msg('round must follow its parent (no skipping)', $$insert into public.script_versions (user_id, script_id, body, kind, parent_id, revision_round) values ('aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','skip','revision','88888888-0000-0000-0000-000000000001',3)$$, 'revision_round_mismatch');
+select pg_temp.denied_msg('a revision needs a parent', $$insert into public.script_versions (user_id, script_id, body, kind, revision_round) values ('aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','orph','revision',1)$$, 'revision_needs_parent');
+select pg_temp.denied_msg('kind and round must agree', $$insert into public.script_versions (user_id, script_id, body, kind, revision_round) values ('aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','x','edit',2)$$, 'revision_shape');
+reset role;
+insert into public.projects (id, user_id, name) values ('22222222-0000-0000-0000-0000000000bb','bbbbbbbb-0000-0000-0000-000000000002','B proj') on conflict do nothing;
+insert into public.scripts (id, user_id, project_id) values ('33333333-0000-0000-0000-0000000000bb','bbbbbbbb-0000-0000-0000-000000000002','22222222-0000-0000-0000-0000000000bb') on conflict do nothing;
+select pg_temp.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select pg_temp.denied('parent from another user/script is rejected', $$insert into public.script_versions (user_id, script_id, body, kind, parent_id) values ('bbbbbbbb-0000-0000-0000-000000000002','33333333-0000-0000-0000-0000000000bb','steal','edit','88888888-0000-0000-0000-000000000001')$$);
+reset role;
+
 select count(*) || ' checks passed' as summary from results where ok;

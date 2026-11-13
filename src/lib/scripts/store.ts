@@ -7,4 +7,4 @@ export async function getOrCreateScript(supabase: SupabaseClient, userId: string
   const ins = await supabase.from("scripts").insert({ user_id: userId, project_id: projectId }).select("id").single();
   return ins.data?.id ?? null;
 }
-export const VERSION_COLUMNS = "id, script_id, body, kind, count_type, target_count, actual_count, counter_policy, scores, created_at, updated_at";
+export const VERSION_COLUMNS = "id, script_id, body, kind, revision_round, parent_id, count_type, target_count, actual_count, counter_policy, scores, created_at, updated_at";

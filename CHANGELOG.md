@@ -35,3 +35,10 @@
 - Migration 0009: version kinds, single autosave slot per script, 60k body cap, 200 versions per script.
 - APIs: `PUT .../scripts/draft` (autosave), `POST .../scripts/versions` (save version), `POST .../scripts/fit`; generation now honours exact targets.
 - Script Studio editor: live counts, exact/over/under, autosave, save version, adjust-to-length, history.
+
+## Day 10 — Quality scoring and revision
+- Rubric `quality.v1`: 9 weighted dimensions (total 100), pass target 85. Total computed in code; evidence quotes verified as literal substrings; factual-caution flags; code-measured metrics; no-virality disclaimer.
+- Revision: one round per request on a saved version; limit of 3 enforced by API and by a DB check + trigger (migration 0010). Re-fits exact length, re-scores the new text.
+- Section rewrite: only the selected range can change (code splices the model's replacement).
+- Export txt/md/json with sanitized filenames, `nosniff`, attachment disposition.
+- APIs: `/scripts/{score,revise,rewrite,export}`; Script Studio score card, Improve, Rewrite selection, export links.
