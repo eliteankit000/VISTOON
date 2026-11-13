@@ -2,7 +2,9 @@ import { getUser } from "@/lib/auth/guards";
 import { csrfGuard, jsonError, readJson, uuid } from "@/lib/api";
 import { getLlm } from "@/lib/llm";
 import { LlmError } from "@/lib/llm/provider";
+import { countBy, policyFor, WORD_POLICY } from "@/lib/scripts/count";
 import { generateScript } from "@/lib/scripts/generate";
+import { fitToLength } from "@/lib/scripts/length";
 import { briefSchema } from "@/lib/scripts/prompts";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -17,7 +19,7 @@ export async function GET(_: Request, { params }: Ctx) {
   const ids = (scripts ?? []).map((s) => s.id);
   if (ids.length === 0) return Response.json({ versions: [] });
   const { data, error } = await supabase.from("script_versions")
-    .select("id, script_id, body, actual_count, counter_policy, created_at").in("script_id", ids).order("created_at", { ascending: false }).limit(50);
+    .select("id, script_id, body, kind, count_type, target_count, actual_count, counter_policy, scores, created_at, updated_at").in("script_id", ids).order("created_at", { ascending: false }).limit(50);
   if (error) return jsonError("Request failed.", 500);
   return Response.json({ versions: data });
 }
@@ -53,8 +55,11 @@ export async function POST(request: Request, { params }: Ctx) {
   const release = () => svc.from("usage_events").delete().eq("id", eventId as number);
 
   let out;
+  let fit: Awaited<ReturnType<typeof fitToLength>> | null = null;
   try {
-    out = await generateScript(getLlm(), brief);
+    const llm = getLlm();
+    out = await generateScript(llm, brief);
+    if (brief.targetType && brief.targetCount) fit = await fitToLength(llm, out.body, brief.targetType, brief.targetCount);
   } catch (e) {
     await release();
     if (e instanceof LlmError) { const m = LLM_STATUS[e.kind]; return m ? jsonError(m[0], m[1]) : jsonError("The AI provider could not produce a script. Please try again.", 502); }
@@ -68,10 +73,13 @@ export async function POST(request: Request, { params }: Ctx) {
     script = ins.data;
   }
   if (!script) return jsonError("Could not save the script.", 500); // quota slot stays used: the provider call was made and billed
+  const body = fit?.body ?? out.body;
+  const type = brief.targetType ?? "words";
   const { data: version, error: vErr } = await supabase.from("script_versions").insert({
-    user_id: user.id, script_id: script.id, body: out.body, count_type: "words", target_count: brief.targetWords ?? null,
-    actual_count: out.words, counter_policy: out.policy, scores: { generation: { promptVersion: out.promptVersion, model: out.model, inputTokens: out.inputTokens, outputTokens: out.outputTokens } },
-  }).select("id, script_id, body, actual_count, counter_policy, created_at").single();
+    user_id: user.id, script_id: script.id, body, kind: "generated", count_type: type, target_count: brief.targetCount ?? null,
+    actual_count: countBy(type, body), counter_policy: brief.targetType ? policyFor(type) : WORD_POLICY,
+    scores: { generation: { promptVersion: out.promptVersion, model: out.model, inputTokens: out.inputTokens, outputTokens: out.outputTokens }, ...(fit ? { length: { exact: fit.exact, rounds: fit.rounds, llmCalls: fit.llmCalls } } : {}) },
+  }).select("id, script_id, body, kind, count_type, target_count, actual_count, counter_policy, scores, created_at, updated_at").single();
   if (vErr || !version) return jsonError("Could not save the script.", 500);
-  return Response.json({ version }, { status: 201 });
+  return Response.json({ version, lengthExact: fit ? fit.exact : null }, { status: 201 });
 }

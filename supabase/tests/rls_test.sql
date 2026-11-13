@@ -201,4 +201,22 @@ select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
 select pg_temp.denied('user cannot call reserve_script_generation', $$select public.reserve_script_generation('aaaaaaaa-0000-0000-0000-000000000001')$$);
 reset role;
 
+-- Day 9: script versions.
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+insert into public.script_versions (user_id, script_id, body, kind) values ('aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','draft one','autosave');
+select pg_temp.denied_msg('second autosave row for the same script is rejected (must overwrite)', $$insert into public.script_versions (user_id, script_id, body, kind) values ('aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','dup','autosave')$$, 'script_versions_one_autosave');
+update public.script_versions set body = 'draft two' where kind='autosave' and script_id='33333333-0000-0000-0000-00000000000a';
+select pg_temp.check('autosave overwrites in place', (select count(*) = 1 and bool_and(body='draft two') from public.script_versions where kind='autosave' and script_id='33333333-0000-0000-0000-00000000000a'));
+select pg_temp.denied_msg('invalid kind rejected', $$insert into public.script_versions (user_id, script_id, body, kind) values ('aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','x','admin')$$, 'kind_check');
+select pg_temp.denied_msg('oversized body rejected', $$insert into public.script_versions (user_id, script_id, body, kind) values ('aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a',repeat('x',60001),'edit')$$, 'body_len');
+select pg_temp.denied_msg('absurd target rejected', $$insert into public.script_versions (user_id, script_id, body, kind, target_count) values ('aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','x','edit',0)$$, 'target_ok');
+insert into public.script_versions (user_id, script_id, body, kind) select 'aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','v'||g,'edit' from generate_series(1,190) g;
+select pg_temp.denied_msg('history is capped at 200 versions per script', $$insert into public.script_versions (user_id, script_id, body, kind) select 'aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','over'||g,'edit' from generate_series(1,20) g$$, 'version_limit_reached');
+select pg_temp.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select pg_temp.check('other user cannot see versions', (select count(*) from public.script_versions) = 0);
+select pg_temp.denied('other user cannot overwrite my autosave', $$update public.script_versions set body='pwned' where script_id='33333333-0000-0000-0000-00000000000a'$$);
+select pg_temp.denied('other user cannot add a version to my script', $$insert into public.script_versions (user_id, script_id, body, kind) values ('bbbbbbbb-0000-0000-0000-000000000002','33333333-0000-0000-0000-00000000000a','x','edit')$$);
+reset role;
+select pg_temp.check('no versions were altered by the other user', (select count(*) from public.script_versions where body='pwned') = 0);
+
 select count(*) || ' checks passed' as summary from results where ok;

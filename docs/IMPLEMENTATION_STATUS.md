@@ -47,3 +47,14 @@
 | Generate/list API | IMPLEMENTED | typechecks, builds; signed-out 401; never run with a real key or signed in |
 | Script Studio UI | IMPLEMENTED | not exercised in a browser |
 | Real Anthropic call | NOT_STARTED | needs ANTHROPIC_API_KEY |
+
+## Day 9 — Exact length validator and editor
+| Item | Status | Evidence |
+|---|---|---|
+| words-v1 / chars-v1 counters | VERIFIED (unit) | tests/length.test.ts, tests/llm.test.ts |
+| Correction loop (max 3, best candidate, model claims ignored) | VERIFIED (against fake LLM) | 9 tests; never run with a real model |
+| Version/autosave constraints, caps, cross-user isolation | VERIFIED (DB) | 10 new local checks (91 total) + 3 live (rolled back) |
+| Draft/versions/fit APIs | IMPLEMENTED | typecheck/build; signed-out 401; not run signed in |
+| Editor UI | IMPLEMENTED | not exercised in a browser |
+| Section rewrite, export | NOT_STARTED | Day 10 |
+| Known limit | | grapheme counts depend on runtime ICU; server count authoritative. Version-cap trigger is not race-proof under concurrent inserts (can exceed 200 slightly) |

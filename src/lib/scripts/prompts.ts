@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** Bump when a template changes; stored with each generation so output can be traced to the prompt that made it. */
-export const PROMPT_VERSION = "script.v1";
+export const PROMPT_VERSION = "script.v2";
 
 export const briefSchema = z.object({
   topic: z.string().trim().min(3).max(300),
@@ -10,8 +10,10 @@ export const briefSchema = z.object({
   format: z.enum(["shorts", "long"]),
   language: z.enum(["en", "hinglish", "hi"]),
   tone: z.string().trim().max(300).optional(),
-  targetWords: z.number().int().min(20).max(3000).optional(),
-}).strict();
+  targetType: z.enum(["words", "chars"]).optional(),
+  targetCount: z.number().int().min(20).max(60000).optional(),
+}).strict().refine((b) => (b.targetType === undefined) === (b.targetCount === undefined), { message: "targetType and targetCount go together" })
+  .refine((b) => b.targetType !== "words" || (b.targetCount ?? 0) <= 3000, { message: "max 3000 words" });
 export type Brief = z.infer<typeof briefSchema>;
 
 const LANG: Record<Brief["language"], string> = {
@@ -36,8 +38,8 @@ export function buildScriptPrompt(b: Brief): { system: string; user: string; max
     `format: ${b.format === "shorts" ? "YouTube Short (under 60 seconds, hook in the first sentence)" : "long-form YouTube video"}`,
     `language: ${LANG[b.language]}`,
     b.tone && `tone: ${clean(b.tone)}`,
-    b.targetWords && `target length: about ${b.targetWords} words`,
+    b.targetCount && `target length: about ${b.targetCount} ${b.targetType === "chars" ? "characters" : "words"}`,
   ].filter(Boolean);
-  const words = b.targetWords ?? (b.format === "shorts" ? 150 : 1200);
+  const words = b.targetType === "chars" ? Math.ceil((b.targetCount ?? 0) / 4) : b.targetCount ?? (b.format === "shorts" ? 150 : 1200);
   return { system: SYSTEM, user: `<brief>\n${lines.join("\n")}\n</brief>\nWrite the script now.`, maxTokens: Math.min(8000, Math.ceil(words * 4) + 400) };
 }

@@ -26,3 +26,7 @@
 ## Day 8 (2026-11-13)
 - `npm test`: 102 pass (31 new LLM/count/prompt tests). `npm run test:rls`: 81 checks. Live quota checks (rolled back): 4 pass.
 - Not tested: real provider call, signed-in generate/save, UI in a browser.
+
+## Day 9 (2026-11-13)
+- Unit tests and RLS checks (91) pass; live script_versions constraint checks (rolled back) pass.
+- Not tested: real model obeying length corrections, UI in a browser, signed-in API calls.

@@ -30,3 +30,8 @@
 - Cost abuse: quota reserved in the DB before the LLM call (atomic per user), released on provider failure; kill switch stops it instantly.
 - Prompt injection: brief is fenced as data with tag characters stripped; output is plain text rendered as text and never executed. Residual risk: model can still be steered inside the script text (low impact).
 - Key exposure: key read server-side only; tests confirm it is absent from request bodies and error messages.
+
+## Day 9 additions
+- Storage/DoS via versions: DB caps (60k chars, 200 versions); autosave overwrites a single row.
+- Cost: correction rounds can make up to 4 model calls per reserved quota slot (bounded, documented).
+- Tampered counts: counts are recomputed server-side on every save; client numbers are never stored.

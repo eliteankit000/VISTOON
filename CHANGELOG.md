@@ -28,3 +28,10 @@
 - Server-side word counter policy `words-v1`.
 - Migration 0008: `plan_limits.generations_per_day` + `reserve_script_generation` (atomic daily cap, kill switch aware).
 - `POST/GET /api/projects/[id]/scripts`; Script Studio wired to real projects and versions.
+
+## Day 9 — Exact length and editor
+- Counting policies `words-v1` and `chars-v1` (grapheme-based, NFC, documented); `checkLength`.
+- `fitToLength`: max 3 correction rounds, every round re-measured by our counter, best candidate returned, never claims exactness without proof.
+- Migration 0009: version kinds, single autosave slot per script, 60k body cap, 200 versions per script.
+- APIs: `PUT .../scripts/draft` (autosave), `POST .../scripts/versions` (save version), `POST .../scripts/fit`; generation now honours exact targets.
+- Script Studio editor: live counts, exact/over/under, autosave, save version, adjust-to-length, history.
