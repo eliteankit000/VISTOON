@@ -97,6 +97,40 @@ select pg_temp.as_user('bbbbbbbb-0000-0000-0000-000000000002');
 select pg_temp.check('B cannot see A assets', (select count(*) from public.assets) = 0);
 reset role;
 
+-- Day 6: stuck-job reaper and worker tables.
+reset role;
+insert into public.styles (id, name, status) values ('44444444-0000-0000-0000-000000000001','S','published') on conflict do nothing;
+insert into public.style_versions (id, style_id, version, adapter, package_sha256) values ('55555555-0000-0000-0000-000000000001','44444444-0000-0000-0000-000000000001','1','remotion','x');
+insert into public.script_versions (id, user_id, script_id, body) values ('66666666-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000001','33333333-0000-0000-0000-00000000000a','b');
+insert into public.render_jobs (id, user_id, project_id, style_version_id, script_version_id, request, state, attempt, heartbeat_at, progress) values
+ ('77777777-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','55555555-0000-0000-0000-000000000001','66666666-0000-0000-0000-000000000001','{}','rendering',0, now() - interval '10 minutes', 40),
+ ('77777777-0000-0000-0000-000000000002','aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','55555555-0000-0000-0000-000000000001','66666666-0000-0000-0000-000000000001','{}','mixing',2, now() - interval '10 minutes', 80),
+ ('77777777-0000-0000-0000-000000000003','aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','55555555-0000-0000-0000-000000000001','66666666-0000-0000-0000-000000000001','{}','rendering',0, now(), 50),
+ ('77777777-0000-0000-0000-000000000004','aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','55555555-0000-0000-0000-000000000001','66666666-0000-0000-0000-000000000001','{}','awaiting_review',0, now() - interval '3 days', 40),
+ ('77777777-0000-0000-0000-000000000005','aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','55555555-0000-0000-0000-000000000001','66666666-0000-0000-0000-000000000001','{}','completed',0, now() - interval '3 days', 100);
+update public.render_jobs set created_at = now() - interval '2 hours' where id = '77777777-0000-0000-0000-000000000002';
+select pg_temp.check('stale_queued_jobs reports nothing for non-queued', (select count(*) from public.stale_queued_jobs(interval '1 hour')) = 0);
+set role service_role;
+select pg_temp.check('reaper touches exactly the 2 stuck jobs', (select count(*) from public.reap_stuck_jobs(interval '5 minutes', 3)) = 2);
+reset role;
+select pg_temp.check('stuck job under cap is re-queued with attempt+1 and reset progress', (select state = 'queued' and attempt = 1 and progress = 0 and heartbeat_at is null from public.render_jobs where id='77777777-0000-0000-0000-000000000001'));
+select pg_temp.check('stuck job at attempt cap fails for good', (select state = 'failed' and finished_at is not null and error like '%exhausted%' from public.render_jobs where id='77777777-0000-0000-0000-000000000002'));
+select pg_temp.check('healthy job untouched', (select state = 'rendering' and attempt = 0 from public.render_jobs where id='77777777-0000-0000-0000-000000000003'));
+select pg_temp.check('awaiting_review (waits for a human) untouched', (select state = 'awaiting_review' and attempt = 0 from public.render_jobs where id='77777777-0000-0000-0000-000000000004'));
+select pg_temp.check('completed job untouched', (select state = 'completed' from public.render_jobs where id='77777777-0000-0000-0000-000000000005'));
+select pg_temp.check('reaper wrote audit events', (select count(*) from public.job_events where message like 'reaper:%') = 2);
+select pg_temp.check('second reaper run finds nothing new', (select count(*) from public.reap_stuck_jobs(interval '5 minutes', 3)) = 0);
+update public.render_jobs set state = 'queued', created_at = now() - interval '2 hours' where id = '77777777-0000-0000-0000-000000000001';
+select pg_temp.check('stale_queued_jobs finds a long-queued job', (select count(*) from public.stale_queued_jobs(interval '1 hour')) = 1);
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select pg_temp.denied('user cannot call reap_stuck_jobs', $$select * from public.reap_stuck_jobs(interval '0', 3)$$);
+select pg_temp.denied('user cannot call stale_queued_jobs', $$select * from public.stale_queued_jobs(interval '0')$$);
+select pg_temp.denied('user cannot read worker_status', $$select 1/0 from public.worker_status$$);
+select pg_temp.denied('user cannot write worker_status', $$insert into public.worker_status (worker_id) values ('evil')$$);
+reset role; set role anon;
+select pg_temp.denied('anon cannot call reap_stuck_jobs', $$select * from public.reap_stuck_jobs(interval '0', 3)$$);
+reset role;
+
 -- anon: nothing.
 reset role; set role anon;
 select pg_temp.denied('anon cannot read projects', $$select 1/0 from public.projects$$);

@@ -1,0 +1,26 @@
+# UNVERIFIED: written without a Docker daemon. Secrets come from the environment / a secrets manager, never from this file.
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD}", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    networks: [internal]          # no published ports: only containers on this network can reach it
+    volumes: [redis-data:/data]
+    restart: unless-stopped
+  worker:
+    build: { context: ., dockerfile: worker/Dockerfile }
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?}
+      WORKER_ID: worker-1
+    depends_on: [redis]
+    networks: [internal]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+networks:
+  internal: { internal: false }   # the worker needs outbound access to Supabase; restrict by egress firewall in production
+volumes:
+  redis-data: {}

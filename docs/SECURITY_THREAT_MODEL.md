@@ -15,3 +15,8 @@
 | Brute force / abuse | Supabase Auth limits only. **App rate limiting not yet built** | NOT_STARTED (Day 27-28) |
 | Malware in uploads | No scanner yet | NOT_STARTED |
 | Rendering-worker abuse | Own compositions only, isolated worker | NOT_STARTED (Day 21-25) |
+
+## Day 6 additions
+- Redis payload tampering: worker re-validates every payload and fails unknown/invalid jobs without retry (tested).
+- Lost/hung workers: lock renewal + stalled recovery, per-job timeouts, DB reaper (tested).
+- Secrets in logs: pino redaction (tested). Redis exposure: compose has no published port + requirepass (unverified).

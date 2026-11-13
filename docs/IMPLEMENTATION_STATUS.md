@@ -16,3 +16,13 @@
 | Stale pending-upload cleanup | 5 | NOT_STARTED | belongs to Day 6 worker (BullMQ job) |
 | Malware scan, media duration limits | 5 | NOT_STARTED | needs worker + ffprobe |
 | Queue + worker skeleton | 6 | NOT_STARTED | next |
+
+## Day 6 — Queue and worker
+| Item | Status | Evidence |
+|---|---|---|
+| Job contracts, producer, states | VERIFIED | tests/queue.test.ts on real Redis |
+| Worker (retry, timeout, cancel, DLQ, audit, stalled recovery via SIGKILL, schedules, heartbeat, health) | VERIFIED | 21 queue tests pass |
+| Stuck-job reaper SQL (0006) | VERIFIED | 12 live checks + 53 local RLS checks |
+| Admin queue API | IMPLEMENTED | typechecks/builds; not exercised signed in |
+| Dockerfile / compose | IMPLEMENTED (unverified) | no Docker daemon here |
+| Error tracking (Sentry) | NOT_STARTED | `reportError` hook only |

@@ -11,3 +11,9 @@
 | Live HTTP probe, signed-out | curl on production build | all 9 API routes 401; pages 307 to login |
 
 **Not run (and why):** signed-in API/UI flows, real uploads, email, MFA. The sandbox cannot reach `*.supabase.co`. These stay at TESTING/IMPLEMENTED until exercised on a machine with network access.
+
+## Day 6 (2026-11-13)
+- `npm test`: 71/71 pass (50 prior + 21 queue incl. real Redis, SIGKILL stalled-job recovery, DLQ, timeout, cancel, redaction).
+- `npm run test:rls`: 53 checks pass. `npm run build`, `tsc --noEmit`: clean.
+- Supabase advisors: only worker_status "RLS no policy" (intentional) and leaked-password protection (needs paid plan).
+- Not tested: Docker build, worker against live Supabase, admin queue API signed in.

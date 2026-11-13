@@ -10,3 +10,9 @@
 
 ## Day 3: renderer inventory, gap report, adapter contract, ADRs.
 ## Day 1-2: design system and screens.
+
+## Day 6 — Queue, worker, observability
+- BullMQ job contracts (strict zod payloads, bounded timeouts/attempts, idempotent job ids), producer with cancel + stats.
+- Worker service: DI database, health endpoints, DLQ + audit on final failure, stalled-job recovery, heartbeats, recurring reaper/cleanup schedules, pino redaction.
+- Migration 0006: `worker_status`, `reap_stuck_jobs`, `stale_queued_jobs` (service role only).
+- `GET /api/admin/queue` (admin + MFA); `worker/Dockerfile`, `docker-compose.yml` (UNVERIFIED: no Docker daemon).

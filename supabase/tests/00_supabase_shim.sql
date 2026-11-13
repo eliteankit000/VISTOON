@@ -13,3 +13,9 @@ create table storage.objects (id uuid primary key default gen_random_uuid(), buc
 alter table storage.objects enable row level security;
 grant usage on schema storage to anon, authenticated;
 grant all on storage.objects to authenticated;  -- mimic Supabase default grants; RLS (no policies) must still deny
+
+-- Supabase gives service_role full table access by default (it also bypasses RLS)
+alter default privileges in schema public grant all on tables to service_role;
+grant all on all tables in schema public to service_role;
+alter default privileges in schema public grant all on sequences to service_role;
+grant all on all sequences in schema public to service_role;
