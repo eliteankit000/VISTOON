@@ -6,6 +6,10 @@ export default function Admin() {
   return (
     <>
       <PageHeader title="Admin Console" desc="Packages, styles and audit. Access will require admin role and MFA." actions={<Button variant="secondary" disabled>Import package</Button>} />
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        {[["/admin/users", "Users and roles", "Promote or demote admins"], ["/admin/controls", "Controls", "Kill switches and feature flags"], ["/admin/audit", "Audit log", "Append-only record of admin actions"]].map(([h, t, d]) => (
+          <Link key={h} href={h!} className="rounded border border-line bg-surface p-4 hover:bg-hover"><p className="text-sm font-medium">{t}</p><p className="text-xs text-muted">{d}</p></Link>))}
+      </div>
       <MockBanner />
       <Card>
         <CardHeader title="Animation styles" desc="Lifecycle: Draft → Needs Review → Testing → Verified → Published." />

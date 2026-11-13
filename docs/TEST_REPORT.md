@@ -17,3 +17,8 @@
 - `npm run test:rls`: 53 checks pass. `npm run build`, `tsc --noEmit`: clean.
 - Supabase advisors: only worker_status "RLS no policy" (intentional) and leaked-password protection (needs paid plan).
 - Not tested: Docker build, worker against live Supabase, admin queue API signed in.
+
+## Day 7 (2026-11-13)
+- `npm run test:rls`: 75 checks pass. Live (rolled back): 8 checks pass. `npm test` 71 pass, build clean.
+- Signed-out probes: new admin APIs 401, pages 307. Cross-origin PATCH is rejected (401 from auth before the 403 CSRF check).
+- Not tested: admin pages signed in with an MFA session.

@@ -16,3 +16,8 @@
 - Worker service: DI database, health endpoints, DLQ + audit on final failure, stalled-job recovery, heartbeats, recurring reaper/cleanup schedules, pino redaction.
 - Migration 0006: `worker_status`, `reap_stuck_jobs`, `stale_queued_jobs` (service role only).
 - `GET /api/admin/queue` (admin + MFA); `worker/Dockerfile`, `docker-compose.yml` (UNVERIFIED: no Docker daemon).
+
+## Day 7 — Admin controls
+- Migration 0007: `kill_switches` (uploads, rendering, script_generation), `feature_flags`, `admin_set_role/_switch/_flag` (service role only, audited atomically), append-only `audit_log` (update/delete/truncate blocked for everyone).
+- DB-enforced kill switches on `assets` and `render_jobs` inserts.
+- APIs `/api/admin/{users,controls,audit}`; pages `/admin/users`, `/admin/controls`, `/admin/audit`.

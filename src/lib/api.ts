@@ -25,5 +25,7 @@ export function dbError(message: string | undefined): Response {
   if (message?.includes("project_limit_reached")) return jsonError("Project limit reached for your plan.", 403);
   if (message?.includes("storage_quota_exceeded")) return jsonError("Storage quota exceeded for your plan.", 403);
   if (message?.includes("too_many_pending_uploads")) return jsonError("Too many unfinished uploads. Finish or wait, then try again.", 429);
+  if (message?.includes("uploads_disabled")) return jsonError("Uploads are temporarily paused.", 503);
+  if (message?.includes("rendering_disabled")) return jsonError("Rendering is temporarily paused.", 503);
   return jsonError("Request failed.", 500);
 }

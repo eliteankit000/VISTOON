@@ -136,4 +136,49 @@ reset role; set role anon;
 select pg_temp.denied('anon cannot read projects', $$select 1/0 from public.projects$$);
 select pg_temp.denied('anon cannot read profiles', $$select 1/0 from public.profiles$$);
 reset role;
+-- Day 7: admin controls.
+reset role;
+insert into auth.users (id) values ('dddddddd-0000-0000-0000-000000000004');
+set role service_role;
+select public.admin_set_role('cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','admin');
+select pg_temp.check('admin can promote a user', (select role='admin' from public.profiles where user_id='dddddddd-0000-0000-0000-000000000004'));
+select pg_temp.denied_msg('admin cannot change own role', $$select public.admin_set_role('cccccccc-0000-0000-0000-000000000003','cccccccc-0000-0000-0000-000000000003','user')$$, 'cannot_change_own_role');
+select pg_temp.denied_msg('non-admin actor is rejected', $$select public.admin_set_role('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','admin')$$, 'not_admin');
+select pg_temp.denied_msg('unknown target is rejected', $$select public.admin_set_role('cccccccc-0000-0000-0000-000000000003','eeeeeeee-0000-0000-0000-000000000009','user')$$, 'user_not_found');
+select public.admin_set_role('cccccccc-0000-0000-0000-000000000003','dddddddd-0000-0000-0000-000000000004','user');
+reset role;
+select pg_temp.check('role changes are audited (promote + demote)', (select count(*) from public.audit_log where action='user.role' and target='dddddddd-0000-0000-0000-000000000004') = 2);
+-- kill switches
+set role service_role;
+select pg_temp.denied_msg('engaging a switch needs a reason', $$select public.admin_set_switch('cccccccc-0000-0000-0000-000000000003','uploads',true,'')$$, 'reason_required');
+select pg_temp.denied_msg('unknown switch rejected', $$select public.admin_set_switch('cccccccc-0000-0000-0000-000000000003','nope',true,'testing')$$, 'unknown_switch');
+select public.admin_set_switch('cccccccc-0000-0000-0000-000000000003','uploads',true,'incident drill');
+select pg_temp.denied_msg('engaged uploads switch blocks new assets (even for service role)', $$insert into public.assets (user_id, project_id, kind, storage_key, mime, bytes, status, rights_confirmed) values ('aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','voiceover','aaaaaaaa-0000-0000-0000-000000000001/k1','audio/mpeg',10,'pending',true)$$, 'uploads_disabled');
+select public.admin_set_switch('cccccccc-0000-0000-0000-000000000003','uploads',false,null);
+select pg_temp.check('releasing the switch re-allows uploads', (select count(*) from public.kill_switches where key='uploads' and not engaged and reason is null) = 1);
+select public.admin_set_switch('cccccccc-0000-0000-0000-000000000003','rendering',true,'cost spike');
+select pg_temp.denied_msg('engaged rendering switch blocks new jobs', $$insert into public.render_jobs (user_id, project_id, style_version_id, script_version_id, request) values ('aaaaaaaa-0000-0000-0000-000000000001','22222222-0000-0000-0000-00000000000a','55555555-0000-0000-0000-000000000001','66666666-0000-0000-0000-000000000001','{}')$$, 'rendering_disabled');
+select public.admin_set_switch('cccccccc-0000-0000-0000-000000000003','rendering',false,null);
+select public.admin_set_flag('cccccccc-0000-0000-0000-000000000003','dna_analyzer',false);
+select pg_temp.check('flag toggled', (select not enabled from public.feature_flags where key='dna_analyzer'));
+select pg_temp.denied_msg('non-admin cannot set flags', $$select public.admin_set_flag('aaaaaaaa-0000-0000-0000-000000000001','dna_analyzer',true)$$, 'not_admin');
+reset role;
+select pg_temp.check('switch and flag changes are audited', (select count(*) from public.audit_log where action like 'killswitch.%' or action='flag.set') = 5);
+-- audit log is append-only, even for the service role
+set role service_role;
+select pg_temp.denied_msg('audit rows cannot be updated', $$update public.audit_log set action='x'$$, 'append_only');
+select pg_temp.denied_msg('audit rows cannot be deleted', $$delete from public.audit_log$$, 'append_only');
+select pg_temp.denied_msg('audit log cannot be truncated', $$truncate public.audit_log$$, 'append_only');
+reset role;
+-- client access
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select pg_temp.check('user can read switches and flags', (select count(*) from public.kill_switches) = 3 and (select count(*) from public.feature_flags) = 3);
+select pg_temp.denied('user cannot write switches', $$update public.kill_switches set engaged = true$$);
+select pg_temp.denied('user cannot write flags', $$update public.feature_flags set enabled = false$$);
+select pg_temp.denied('user cannot call admin_set_role', $$select public.admin_set_role('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','admin')$$);
+select pg_temp.denied('user cannot call admin_set_switch', $$select public.admin_set_switch('aaaaaaaa-0000-0000-0000-000000000001','uploads',true,'xxx')$$);
+reset role; set role anon;
+select pg_temp.denied('anon cannot read switches', $$select 1/0 from public.kill_switches$$);
+reset role;
+
 select count(*) || ' checks passed' as summary from results where ok;

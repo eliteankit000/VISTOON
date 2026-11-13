@@ -20,3 +20,8 @@
 - Redis payload tampering: worker re-validates every payload and fails unknown/invalid jobs without retry (tested).
 - Lost/hung workers: lock renewal + stalled recovery, per-job timeouts, DB reaper (tested).
 - Secrets in logs: pino redaction (tested). Redis exposure: compose has no published port + requirepass (unverified).
+
+## Day 7 additions
+- Privilege escalation: roles change only via service-role RPC that re-checks the actor is admin; self-change blocked; audited.
+- Incident response: kill switches act in the DB, so they stop uploads/renders regardless of code path.
+- Audit tampering: append-only triggers (a superuser/DB owner could still drop them; mitigated by external log shipping later).

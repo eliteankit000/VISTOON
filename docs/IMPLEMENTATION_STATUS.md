@@ -26,3 +26,14 @@
 | Admin queue API | IMPLEMENTED | typechecks/builds; not exercised signed in |
 | Dockerfile / compose | IMPLEMENTED (unverified) | no Docker daemon here |
 | Error tracking (Sentry) | NOT_STARTED | `reportError` hook only |
+
+## Day 7 — Admin controls
+| Item | Status | Evidence |
+|---|---|---|
+| Role management (no self-change, actor re-checked, audited) | VERIFIED (DB) | 22 new local checks (75 total) + 8 live checks, rolled back |
+| Kill switches enforced in DB (uploads, rendering) | VERIFIED (DB) | local + live checks |
+| Append-only audit log | VERIFIED (DB) | update/delete/truncate rejected, local + live |
+| Feature flags | IMPLEMENTED | DB verified; flags are not yet read by feature pages |
+| `script_generation` switch | IMPLEMENTED | stored; enforced when Script Studio (Day 8+) exists |
+| Admin APIs and pages | IMPLEMENTED | build ok; signed-out probes 401/307; not exercised signed in with MFA |
+| Reauthentication for sensitive actions | NOT_STARTED | |
