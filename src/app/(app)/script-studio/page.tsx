@@ -22,6 +22,8 @@ export default function ScriptStudio() {
   const [tCount, setTCount] = React.useState("");
   const loaded = React.useRef(false);
   const area = React.useRef<HTMLTextAreaElement>(null);
+  const [dnaCols, setDnaCols] = React.useState<{ id: string; name: string }[]>([]);
+  const [dnaId, setDnaId] = React.useState("");
   const [selId, setSelId] = React.useState<string | null>(null);
   const [selText, setSelText] = React.useState("");
   const [quality, setQuality] = React.useState<Quality | null>(null);
@@ -40,6 +42,8 @@ export default function ScriptStudio() {
       if (list[0]) setProjectId(list[0].id);
     })();
   }, []);
+
+  React.useEffect(() => { void (async () => { const r = await fetch("/api/dna/collections"); if (r.ok) setDnaCols((await r.json()).collections); })(); }, []);
 
   React.useEffect(() => {
     if (!projectId) return;
@@ -133,6 +137,7 @@ export default function ScriptStudio() {
     const body: Record<string, unknown> = { topic: f.topic, format: f.format, language: f.language };
     for (const k of ["niche", "audience", "tone"] as const) if (f[k].trim()) body[k] = f[k].trim();
     if (hasTarget) { body.targetType = tType; body.targetCount = target; }
+    if (dnaId) body.dnaCollectionId = dnaId;
     const r = await fetch(`/api/projects/${projectId}/scripts`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     setBusy(false);
@@ -164,6 +169,7 @@ export default function ScriptStudio() {
               <Field label="Format"><Select value={f.format} onChange={(e) => setF({ ...f, format: e.target.value })}><option value="shorts">Shorts</option><option value="long">Long-form</option></Select></Field>
               <Field label="Exact length" hint={tType === "words" ? "20–3000" : "20–60000"}><div className="flex gap-1"><Select value={tType} onChange={(e) => setTType(e.target.value as CountType)}><option value="words">words</option><option value="chars">chars</option></Select><Input type="number" value={tCount} onChange={(e) => setTCount(e.target.value)} /></div></Field>
             </div>
+            {dnaCols.length > 0 && <Field label="DNA profile (optional)" hint="Uses only findings you accepted or edited"><Select value={dnaId} onChange={(e) => setDnaId(e.target.value)}><option value="">None</option>{dnaCols.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>}
             <Field label="Tone / instructions"><Textarea rows={3} maxLength={300} value={f.tone} onChange={(e) => setF({ ...f, tone: e.target.value })} /></Field>
             <Button className="w-full" loading={busy} disabled={!valid} onClick={generate}>Generate script</Button>
           </div>

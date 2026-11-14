@@ -1,6 +1,7 @@
 import { generateWithRetry, type RetryOptions } from "@/lib/llm/retry";
 import type { LlmProvider } from "@/lib/llm/provider";
 import { LlmError } from "@/lib/llm/provider";
+import type { ProfileItem } from "@/lib/dna/profile";
 import { countWords, WORD_POLICY } from "./count";
 import { buildScriptPrompt, PROMPT_VERSION, type Brief } from "./prompts";
 
@@ -11,8 +12,8 @@ export function tidy(raw: string): string {
   return raw.replace(/^```[a-z]*\n?|```$/gim, "").replace(/^\s*(script|voiceover)\s*:\s*/i, "").trim();
 }
 
-export async function generateScript(llm: LlmProvider, brief: Brief, retry?: RetryOptions): Promise<Generated> {
-  const p = buildScriptPrompt(brief);
+export async function generateScript(llm: LlmProvider, brief: Brief, retry?: RetryOptions, profile: ProfileItem[] = []): Promise<Generated> {
+  const p = buildScriptPrompt(brief, profile);
   const r = await generateWithRetry(llm, { ...p, temperature: 0.8 }, retry);
   const body = tidy(r.text);
   if (body.length < 20) throw new LlmError("bad_response", "The AI provider returned an unusable script.", false);

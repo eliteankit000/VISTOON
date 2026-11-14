@@ -28,6 +28,7 @@ export default function Dna() {
   const [busy, setBusy] = React.useState<string | null>(null);
   const [confirmDel, setConfirmDel] = React.useState<null | { kind: "collection" | "transcript"; id: string; name: string }>(null);
   const [err, setErr] = React.useState<string | null>(null);
+  const [editing, setEditing] = React.useState<{ id: string; text: string } | null>(null);
 
   const api = async (url: string, method = "GET", payload?: unknown) => {
     const r = await fetch(url, { method, headers: payload ? { "content-type": "application/json" } : undefined, body: payload ? JSON.stringify(payload) : undefined });
@@ -76,6 +77,11 @@ export default function Dna() {
     setBody(await f.text()); if (!title) setTitle(f.name.replace(/\.(txt|srt|vtt)$/i, "").slice(0, 200));
   }
   async function patchT(id: string, p: object) { const r = await api(`/api/dna/transcripts/${id}`, "PATCH", p); if (!r.ok) toast(r.j.error ?? "Failed", "danger"); else await loadDetail(sel); }
+  async function patchF(id: string, p: object) {
+    const r = await api(`/api/dna/findings/${id}`, "PATCH", p);
+    if (!r.ok) { toast(r.j.error ?? "Could not update", "danger"); return false; }
+    await loadDetail(sel); return true;
+  }
   async function analyze() {
     setBusy("analyze");
     const r = await api(`/api/dna/collections/${sel}/analyze`, "POST");
@@ -144,17 +150,26 @@ export default function Dna() {
                   </ul>)}
               </Card>
               <Card>
-                <CardHeader title="Evidence ledger" desc="Every finding shows the excerpts it rests on and the transcripts where it did not appear. Click Analyze after changing transcripts." />
+                <CardHeader title="Evidence ledger" desc="Every finding shows the excerpts it rests on and the transcripts where it did not appear. Accepted findings can guide Script Studio. Click Analyze after changing transcripts."
+                  action={detail.findings.length > 0 ? <span className="flex gap-2 text-xs">{(["json", "markdown"] as const).map((x) => <a key={x} className="underline" href={`/api/dna/collections/${sel}/export?format=${x}`}>Export {x === "json" ? "JSON" : "Markdown"}</a>)}</span> : undefined} />
                 {detail.findings.length === 0 ? <EmptyState title="No findings yet" desc={active ? "The analysis is running…" : "Add transcripts and click Analyze."} /> : (
                   <ul className="divide-y divide-line">
                     {detail.findings.map((f) => (
                       <li key={f.id} className="px-5 py-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-sm font-medium">{f.technique}</p>
-                          <span className="flex items-center gap-2"><Badge>{f.sample_count} sample{f.sample_count === 1 ? "" : "s"}</Badge><Badge>{f.confidence} confidence</Badge><Badge tone={tone[f.label as keyof typeof tone] ?? "neutral"}>{f.label}</Badge></span>
+                          <span className="flex items-center gap-2">{f.status !== "proposed" && <Badge tone={f.status === "rejected" ? "danger" : "success"}>{f.status}</Badge>}<Badge>{f.sample_count} sample{f.sample_count === 1 ? "" : "s"}</Badge><Badge>{f.confidence} confidence</Badge><Badge tone={tone[f.label as keyof typeof tone] ?? "neutral"}>{f.label}</Badge></span>
                         </div>
                         <p className="mt-1 text-xs text-muted">{MEANING[f.label]}</p>
-                        <p className="mt-2 text-sm">{f.explanation}</p>
+                        {editing?.id === f.id ? (
+                          <div className="mt-2 space-y-2"><Textarea rows={3} maxLength={2000} value={editing.text} onChange={(e) => setEditing({ id: f.id, text: e.target.value })} aria-label="Finding wording" />
+                            <div className="flex gap-2"><Button size="sm" disabled={!editing.text.trim()} onClick={async () => { if (await patchF(f.id, { explanation: editing.text })) setEditing(null); }}>Save wording</Button><Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button></div></div>
+                        ) : <p className={`mt-2 text-sm ${f.status === "rejected" ? "text-muted line-through" : ""}`}>{f.explanation}</p>}
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          <Button size="sm" variant="secondary" disabled={f.status === "accepted" || f.status === "edited"} onClick={() => patchF(f.id, { status: "accepted" })}>Accept</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditing({ id: f.id, text: f.explanation })}>Edit wording</Button>
+                          {f.status === "rejected" ? <Button size="sm" variant="ghost" onClick={() => patchF(f.id, { status: "proposed" })}>Restore</Button> : <Button size="sm" variant="ghost" onClick={() => patchF(f.id, { status: "rejected" })}>Reject</Button>}
+                        </div>
                         <details className="mt-2 text-xs"><summary className="cursor-pointer text-muted">Evidence ({f.evidence.length}) and counterexamples ({f.counterexamples.length})</summary>
                           <ul className="mt-2 space-y-2">{f.evidence.map((e, i) => <li key={i} className="border-l-2 border-line pl-2"><span className="italic">“{e.excerpt}”</span><br /><span className="text-muted">{e.title}: {e.note}</span></li>)}</ul>
                           {f.counterexamples.length > 0 && <p className="mt-2 text-muted">Not found in: {f.counterexamples.map((c) => c.title).join(", ")}</p>}

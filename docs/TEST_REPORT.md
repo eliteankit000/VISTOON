@@ -38,3 +38,7 @@
 ## Day 11 (2026-11-14)
 - Unit/worker tests and 115 RLS checks pass (see final run); live DNA isolation checks (rolled back) pass.
 - Not tested: real model, end-to-end enqueue -> real worker -> live Supabase, UI in a browser, signed-in API calls.
+
+## Day 12 (2026-11-14)
+- Unit tests and 126 RLS checks pass; live column-privilege check on `dna_findings` confirms users cannot insert/delete or change label/evidence.
+- Not tested: real model use of the profile, two-real-user API isolation, UI in a browser.

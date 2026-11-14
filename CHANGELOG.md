@@ -50,3 +50,10 @@
 - Findings and the five labels are assigned by code from counts (not by the model); fewer than 3 transcripts is always UNVERIFIED_HYPOTHESIS; high-performer association needs user-marked transcripts and is worded as association.
 - Background `analyzeDna` worker job: idempotent claim, per-transcript cache so adding a transcript costs one AI call, user-edited findings preserved.
 - APIs under `/api/dna/*`; DNA Analyzer page (collections, paste/upload, exclude, high-performer mark, analyze with polling, evidence ledger).
+
+## Day 12 — Evidence ledger, exports, DNA profile in Script Studio
+- Migration 0012: findings are server-written; users may only update `explanation` and `status`; a reworded finding becomes "edited" by trigger; "edited" cannot be claimed without editing; label/evidence/counts/delete/insert are revoked from users.
+- `PATCH /api/dna/findings/[id]` (accept / reject / restore / reword).
+- `GET /api/dna/collections/[id]/export?format=json|markdown`: evidence, counterexamples, labels, disclaimer; never source transcript text; rejected omitted by default; Markdown escaped (HTML entities) against injection.
+- DNA profile for Script Studio: only accepted/edited findings, no source excerpts, fenced as data, "do not copy phrases" rule; prompt `script.v3`.
+- UI: Accept / Edit wording / Reject / Restore, export links, DNA profile selector.

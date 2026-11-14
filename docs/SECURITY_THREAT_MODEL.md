@@ -46,3 +46,8 @@
 - Prompt injection via transcripts: fenced as data; fabricated quotes discarded; labels assigned by code, so a transcript cannot talk its way into CORE_PATTERN.
 - Misleading claims: <3 samples is always unverified; association wording; every finding states the sample limit.
 - Upload risk: transcripts are text only, read in the browser; the server cleans control/bidi characters and never renders them as HTML.
+
+## Day 12 additions
+- Ledger forgery: users cannot insert findings or change label, evidence, counts (column-level grants + trigger); tested locally and on the live schema.
+- Export leakage: source transcripts excluded; only titles/metadata and short excerpts; download-only, nosniff, no-store; Markdown HTML-escaped.
+- Hypotheses as rules: unvetted (proposed) and rejected findings never reach prompts; UNVERIFIED items are labelled experiments.

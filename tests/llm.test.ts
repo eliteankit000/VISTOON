@@ -105,7 +105,7 @@ describe("script generation", () => {
   const brief = briefSchema.parse({ topic: "Black holes", format: "shorts", language: "en" });
   it("returns the body with a deterministic server-side count", async () => {
     const r = await generateScript(fake("Black holes bend time itself. Here is why that matters to you."), brief);
-    expect(r).toMatchObject({ words: 12, policy: "words-v1", promptVersion: "script.v2", model: "fm" });
+    expect(r).toMatchObject({ words: 12, policy: "words-v1", promptVersion: "script.v3", model: "fm" });
   });
   it("tidies fences and labels", () => { expect(tidy("```text\nScript: Hello world\n```")).toBe("Hello world"); });
   it("rejects unusable output", async () => {

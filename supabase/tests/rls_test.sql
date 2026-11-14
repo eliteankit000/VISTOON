@@ -246,10 +246,12 @@ insert into public.dna_transcripts (id, user_id, collection_id, body, title, bod
 select pg_temp.denied_msg('duplicate transcript (same hash) is rejected', $$insert into public.dna_transcripts (user_id, collection_id, body, title, body_sha256) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a',repeat('word ',20),'T1 again','sha1')$$, 'no_dupes');
 select pg_temp.denied_msg('tiny transcript rejected', $$insert into public.dna_transcripts (user_id, collection_id, body, title, body_sha256) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a','short','T','sha2')$$, 'body_len');
 select pg_temp.denied_msg('huge transcript rejected', $$insert into public.dna_transcripts (user_id, collection_id, body, title, body_sha256) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a',repeat('x',100001),'T','sha3')$$, 'body_len');
+reset role; set role service_role;  -- findings are server-written: constraints are checked as the server
 select pg_temp.denied_msg('bad finding label rejected', $$insert into public.dna_findings (user_id, collection_id, label, technique, evidence, sample_count) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a','PROVEN_VIRAL','x','[{"a":1}]',1)$$, 'label_check');
 select pg_temp.denied_msg('finding without evidence rejected', $$insert into public.dna_findings (user_id, collection_id, label, technique, evidence, sample_count) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a','CORE_PATTERN','x','[]',1)$$, 'evidence_check');
 insert into public.dna_findings (id, user_id, collection_id, label, technique, technique_key, evidence, sample_count) values ('d2000000-0000-0000-0000-00000000000a','aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a','UNVERIFIED_HYPOTHESIS','Hook','hook','[{"t":"x"}]',1);
 select pg_temp.denied_msg('one finding per technique per collection', $$insert into public.dna_findings (user_id, collection_id, label, technique, technique_key, evidence, sample_count) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a','CORE_PATTERN','Hook 2','hook','[{"t":"x"}]',1)$$, 'one_per_technique');
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
 select pg_temp.denied('user cannot write observations', $$insert into public.dna_observations (user_id, transcript_id, prompt_version, observations) values ('aaaaaaaa-0000-0000-0000-000000000001','d1000000-0000-0000-0000-00000000000a','v','[]')$$);
 select pg_temp.denied('user cannot create analyses', $$insert into public.dna_analyses (user_id, collection_id) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a')$$);
 reset role;
@@ -274,5 +276,25 @@ insert into public.dna_collections (user_id, name) select 'aaaaaaaa-0000-0000-00
 select pg_temp.denied_msg('21st collection is rejected', $$insert into public.dna_collections (user_id, name) values ('aaaaaaaa-0000-0000-0000-000000000001','C21')$$, 'collection_limit_reached');
 reset role;
 select pg_temp.denied('anon cannot read dna_analyses', $$select 1/0 from public.dna_analyses$$);
+
+-- Day 12: evidence ledger integrity.
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select pg_temp.denied('user cannot insert findings (server-written)', $$insert into public.dna_findings (user_id, collection_id, label, technique, technique_key, evidence, sample_count) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a','CORE_PATTERN','Forged','forged','[{"t":"x"}]',9)$$);
+select pg_temp.denied('user cannot change a finding label', $$update public.dna_findings set label='CORE_PATTERN' where id='d2000000-0000-0000-0000-00000000000a'$$);
+select pg_temp.denied('user cannot change evidence', $$update public.dna_findings set evidence='[{"fake":1}]' where id='d2000000-0000-0000-0000-00000000000a'$$);
+select pg_temp.denied('user cannot change sample count', $$update public.dna_findings set sample_count=99 where id='d2000000-0000-0000-0000-00000000000a'$$);
+select pg_temp.denied('user cannot delete a finding', $$delete from public.dna_findings where id='d2000000-0000-0000-0000-00000000000a'$$);
+update public.dna_findings set status='accepted' where id='d2000000-0000-0000-0000-00000000000a';
+select pg_temp.check('user can accept a finding', (select status='accepted' from public.dna_findings where id='d2000000-0000-0000-0000-00000000000a'));
+select pg_temp.denied_msg('cannot claim "edited" without editing', $$update public.dna_findings set status='edited' where id='d2000000-0000-0000-0000-00000000000a'$$, 'invalid_status');
+update public.dna_findings set explanation='My own wording' where id='d2000000-0000-0000-0000-00000000000a';
+select pg_temp.check('editing the explanation marks the finding edited automatically', (select status='edited' and explanation='My own wording' from public.dna_findings where id='d2000000-0000-0000-0000-00000000000a'));
+select pg_temp.denied_msg('explanation cannot be blanked', $$update public.dna_findings set explanation='   ' where id='d2000000-0000-0000-0000-00000000000a'$$, 'explanation_required');
+update public.dna_findings set status='rejected' where id='d2000000-0000-0000-0000-00000000000a';
+select pg_temp.check('user can reject a finding (kept, not deleted)', (select status='rejected' from public.dna_findings where id='d2000000-0000-0000-0000-00000000000a'));
+reset role; set role service_role;
+update public.dna_findings set explanation='Machine rewrite', label='CORE_PATTERN', sample_count=4 where id='d2000000-0000-0000-0000-00000000000a';
+select pg_temp.check('server updates do not flip status to edited and may change machine fields', (select status='rejected' and label='CORE_PATTERN' and sample_count=4 from public.dna_findings where id='d2000000-0000-0000-0000-00000000000a'));
+reset role;
 
 select count(*) || ' checks passed' as summary from results where ok;

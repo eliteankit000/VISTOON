@@ -3,6 +3,7 @@ import { csrfGuard, jsonError, readJson, uuid } from "@/lib/api";
 import { getLlm } from "@/lib/llm";
 import { LlmError } from "@/lib/llm/provider";
 import { countBy, policyFor, WORD_POLICY } from "@/lib/scripts/count";
+import { profileFromFindings, type ProfileItem } from "@/lib/dna/profile";
 import { generateScript } from "@/lib/scripts/generate";
 import { fitToLength } from "@/lib/scripts/length";
 import { briefSchema } from "@/lib/scripts/prompts";
@@ -45,6 +46,15 @@ export async function POST(request: Request, { params }: Ctx) {
   if (!project) return jsonError("Not found", 404);
   if (project.archived_at) return jsonError("This project is archived.", 409);
 
+  // Optional DNA profile: loaded with the user's own session, so only their own vetted findings can ever be used.
+  let profile: ProfileItem[] = [];
+  if (brief.dnaCollectionId) {
+    const { data: col } = await supabase.from("dna_collections").select("id").eq("id", brief.dnaCollectionId).maybeSingle();
+    if (!col) return jsonError("DNA collection not found.", 404);
+    const { data: fs } = await supabase.from("dna_findings").select("technique, label, explanation, status").eq("collection_id", col.id);
+    profile = profileFromFindings(fs ?? []);
+  }
+
   const svc = createServiceClient();
   const { data: eventId, error: resErr } = await svc.rpc("reserve_script_generation", { uid: user.id });
   if (resErr) {
@@ -58,7 +68,7 @@ export async function POST(request: Request, { params }: Ctx) {
   let fit: Awaited<ReturnType<typeof fitToLength>> | null = null;
   try {
     const llm = getLlm();
-    out = await generateScript(llm, brief);
+    out = await generateScript(llm, brief, undefined, profile);
     if (brief.targetType && brief.targetCount) fit = await fitToLength(llm, out.body, brief.targetType, brief.targetCount);
   } catch (e) {
     await release();
@@ -78,7 +88,7 @@ export async function POST(request: Request, { params }: Ctx) {
   const { data: version, error: vErr } = await supabase.from("script_versions").insert({
     user_id: user.id, script_id: script.id, body, kind: "generated", count_type: type, target_count: brief.targetCount ?? null,
     actual_count: countBy(type, body), counter_policy: brief.targetType ? policyFor(type) : WORD_POLICY,
-    scores: { generation: { promptVersion: out.promptVersion, model: out.model, inputTokens: out.inputTokens, outputTokens: out.outputTokens }, ...(fit ? { length: { exact: fit.exact, rounds: fit.rounds, llmCalls: fit.llmCalls } } : {}) },
+    scores: { generation: { promptVersion: out.promptVersion, model: out.model, inputTokens: out.inputTokens, outputTokens: out.outputTokens, dnaTechniques: profile.map((p) => p.technique) }, ...(fit ? { length: { exact: fit.exact, rounds: fit.rounds, llmCalls: fit.llmCalls } } : {}) },
   }).select("id, script_id, body, kind, count_type, target_count, actual_count, counter_policy, scores, created_at, updated_at").single();
   if (vErr || !version) return jsonError("Could not save the script.", 500);
   return Response.json({ version, lengthExact: fit ? fit.exact : null }, { status: 201 });

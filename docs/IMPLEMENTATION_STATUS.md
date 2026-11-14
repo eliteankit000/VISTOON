@@ -78,3 +78,12 @@
 | APIs and page | IMPLEMENTED | typecheck/build/401 probes; never run signed in or with a real model |
 | Accept/edit/reject findings, exports, select profile in Script Studio | NOT_STARTED | Day 12 |
 | Known gaps | | AI slots reserved for a run are not refunded if the worker later fails. Real-model observation quality unknown. Analysis needs Redis + a running worker. |
+
+## Day 12 — Evidence ledger, exports, profile selection
+| Item | Status | Evidence |
+|---|---|---|
+| Ledger integrity (user can only accept/reject/reword) | VERIFIED (DB) | 11 new local checks (126 total); live privilege check on the real project |
+| Export (JSON/Markdown) evidence-preserving, escaped, no transcripts | VERIFIED (unit) | tests/dna-ledger.test.ts |
+| DNA profile in prompts (vetted findings only, no excerpts) | VERIFIED (unit) | tests; not evaluated with a real model |
+| Finding PATCH / export APIs, ledger UI, profile selector | IMPLEMENTED | typecheck/build/401 probes; not run signed in or in a browser |
+| Known gaps | | A cross-tenant API test (two real signed-in users) has not been run; isolation is verified at database level (RLS) only. Export download not exercised in a browser. |
