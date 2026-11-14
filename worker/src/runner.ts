@@ -4,10 +4,11 @@ import type { Logger } from "pino";
 import { JOBS, QUEUES, isJobName, type JobName } from "../../src/lib/queue/contracts";
 import type { Db } from "./db";
 import { dispatch } from "./processors";
+import type { LlmProvider } from "../../src/lib/llm/provider";
 import { runGuarded } from "./runtime";
 
 export type RunnerOptions = {
-  redisUrl: string; db: Db; log: Logger; workerId: string;
+  redisUrl: string; db: Db; log: Logger; workerId: string; llm?: LlmProvider | null;
   prefix?: string; concurrency?: number;
   lockDurationMs?: number; stalledIntervalMs?: number; maxStalledCount?: number;
   cancelPollMs?: number; statusIntervalMs?: number; schedules?: boolean;
@@ -30,7 +31,7 @@ export async function startWorkers(o: RunnerOptions) {
     const log = o.log.child({ jobId: job.id, job: name, attempt: job.attemptsMade + 1 });
     const t0 = Date.now();
     log.info("job started");
-    const result = await runGuarded({ redis, queue, jobId: job.id as string, timeoutMs, pollMs: o.cancelPollMs }, (signal) => dispatch(job, { signal, log, db: o.db }));
+    const result = await runGuarded({ redis, queue, jobId: job.id as string, timeoutMs, pollMs: o.cancelPollMs }, (signal) => dispatch(job, { signal, log, db: o.db, llm: o.llm }));
     log.info({ ms: Date.now() - t0 }, "job completed");
     return result;
   };

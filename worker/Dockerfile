@@ -5,6 +5,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json ./
 COPY src/lib/queue ./src/lib/queue
+COPY src/lib/llm ./src/lib/llm
+COPY src/lib/dna ./src/lib/dna
 COPY worker ./worker
 RUN npx esbuild worker/src/index.ts --bundle --platform=node --format=esm --target=node20 --packages=external --outfile=dist/worker/index.mjs
 

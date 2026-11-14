@@ -68,3 +68,13 @@
 | Export (txt/md/json, safe filenames/headers) | VERIFIED (unit) | tests; download not exercised in a browser |
 | score/revise/rewrite/export APIs and UI | IMPLEMENTED | typecheck/build/401 probes; never run signed in or with a real model |
 | Known limits | | Hand-edit + save starts a fresh revision chain (quota is the real brake). A revise call costs 2 quota slots but can make up to ~7 model calls. Scores are model opinions; real-model calibration not done |
+
+## Day 11 — DNA transcript intake and analysis
+| Item | Status | Evidence |
+|---|---|---|
+| DNA tables, limits, dedupe, tenant isolation | VERIFIED (DB) | 19 new local checks (115 total); 5 live checks (rolled back), incl. cross-user read/insert |
+| Cleaner, observation verification, label rules | VERIFIED (unit) | tests/dna.test.ts (21) |
+| Worker job (accumulate, cache, idempotent, failure, cancel) | VERIFIED (fake DB + fake LLM) | tests/dna-worker.test.ts (8); not run against live Supabase or Redis end to end |
+| APIs and page | IMPLEMENTED | typecheck/build/401 probes; never run signed in or with a real model |
+| Accept/edit/reject findings, exports, select profile in Script Studio | NOT_STARTED | Day 12 |
+| Known gaps | | AI slots reserved for a run are not refunded if the worker later fails. Real-model observation quality unknown. Analysis needs Redis + a running worker. |

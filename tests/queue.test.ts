@@ -36,6 +36,7 @@ function fakeDb() {
   let removeFails = false;
   const db: Db = {
     reapStuckJobs: async (s, m) => { calls.reap.push([s, m]); return [{ jobId: "j-lost", ownerId: "u1", action: "requeued" }]; },
+    claimAnalysis: async () => null, loadDnaTranscripts: async () => [], saveObservations: async () => {}, saveFindings: async () => {}, finishAnalysis: async () => {},
     staleQueuedJobs: async () => [],
     stalePendingAssets: async () => pending,
     removeStorage: async (k) => { calls.order.push("remove"); if (removeFails) throw new Error("storage down"); calls.removed.push(k); },
@@ -285,6 +286,6 @@ describe("structured logging", () => {
     expect(REDACT.length).toBeGreaterThan(5);
   });
   it("contracts: every job has a bounded timeout and retry cap", () => {
-    for (const j of Object.values(JOBS)) { expect(j.timeoutMs).toBeGreaterThan(0); expect(j.timeoutMs).toBeLessThanOrEqual(300_000); expect(j.attempts).toBeLessThanOrEqual(5); }
+    for (const j of Object.values(JOBS)) { expect(j.timeoutMs).toBeGreaterThan(0); expect(j.timeoutMs).toBeLessThanOrEqual(1_800_000); expect(j.attempts).toBeLessThanOrEqual(5); }
   });
 });

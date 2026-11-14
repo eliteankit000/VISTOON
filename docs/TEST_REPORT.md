@@ -34,3 +34,7 @@
 ## Day 10 (2026-11-13)
 - Unit + RLS: all pass (see totals below in final run); live revision constraint checks (rolled back) pass.
 - Not tested: real model scoring quality/consistency, UI in a browser, signed-in API calls, file download in a browser.
+
+## Day 11 (2026-11-14)
+- Unit/worker tests and 115 RLS checks pass (see final run); live DNA isolation checks (rolled back) pass.
+- Not tested: real model, end-to-end enqueue -> real worker -> live Supabase, UI in a browser, signed-in API calls.

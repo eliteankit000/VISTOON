@@ -42,3 +42,11 @@
 - Section rewrite: only the selected range can change (code splices the model's replacement).
 - Export txt/md/json with sanitized filenames, `nosniff`, attachment disposition.
 - APIs: `/scripts/{score,revise,rewrite,export}`; Script Studio score card, Improve, Rewrite selection, export links.
+
+## Day 11 — DNA Analyzer: intake and analysis
+- Migration 0011: transcript metadata and limits (30 per collection, 20 collections), duplicate detection, cached `dna_observations`, `dna_analyses` (one active run per collection, server-written), findings with explanation/counterexamples/status.
+- Transcript cleaner (.txt/.srt/.vtt/paste), language guess, fixed 12-technique taxonomy.
+- Observations: the model quotes the transcript; quotes are verified as literal substrings or dropped.
+- Findings and the five labels are assigned by code from counts (not by the model); fewer than 3 transcripts is always UNVERIFIED_HYPOTHESIS; high-performer association needs user-marked transcripts and is worded as association.
+- Background `analyzeDna` worker job: idempotent claim, per-transcript cache so adding a transcript costs one AI call, user-edited findings preserved.
+- APIs under `/api/dna/*`; DNA Analyzer page (collections, paste/upload, exclude, high-performer mark, analyze with polling, evidence ledger).

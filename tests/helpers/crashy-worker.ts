@@ -6,6 +6,7 @@ import type { Db } from "../../worker/src/db";
 const db: Db = {
   reapStuckJobs: async () => [], staleQueuedJobs: async () => [], stalePendingAssets: async () => [], removeStorage: async () => {},
   deleteAssets: async () => {}, recordAudit: async () => {}, recordUsage: async () => {}, upsertWorkerStatus: async () => {}, ping: async () => true,
+  claimAnalysis: async () => null, loadDnaTranscripts: async () => [], saveObservations: async () => {}, saveFindings: async () => {}, finishAnalysis: async () => {},
 };
 (async () => {
   await startWorkers({ redisUrl: process.env.REDIS_URL!, prefix: process.env.PREFIX, db, log: createLogger(undefined, "silent"), workerId: "crashy",

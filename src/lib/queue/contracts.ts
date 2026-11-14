@@ -19,6 +19,11 @@ export const JOBS = {
     queue: QUEUES.system, timeoutMs: 120_000, attempts: 1,
     schema: z.object({ olderThanMinutes: z.number().int().min(15).max(10_080), limit: z.number().int().min(1).max(500) }).strict(),
   },
+  // DNA Analyzer: extracts techniques from each new transcript (cached), then rebuilds the collection's findings.
+  analyzeDna: {
+    queue: QUEUES.system, timeoutMs: 20 * 60_000, attempts: 1,
+    schema: z.object({ analysisId: z.string().uuid() }).strict(),
+  },
 } as const;
 
 export type JobName = keyof typeof JOBS;

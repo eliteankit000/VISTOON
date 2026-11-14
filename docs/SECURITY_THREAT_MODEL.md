@@ -40,3 +40,9 @@
 - Score gaming/prompt injection: script is fenced as data; total computed in code; fabricated evidence is discarded.
 - Download attacks: sanitized filename, `nosniff`, attachment, `private, no-store`; text types only.
 - Cost: revision/score/rewrite reserve quota slots before calling the model and release them on failure.
+
+## Day 11 additions
+- Cross-tenant DNA access: RLS on all DNA tables; observations/analyses are read-only to users; tested locally and live.
+- Prompt injection via transcripts: fenced as data; fabricated quotes discarded; labels assigned by code, so a transcript cannot talk its way into CORE_PATTERN.
+- Misleading claims: <3 samples is always unverified; association wording; every finding states the sample limit.
+- Upload risk: transcripts are text only, read in the browser; the server cleans control/bidi characters and never renders them as HTML.

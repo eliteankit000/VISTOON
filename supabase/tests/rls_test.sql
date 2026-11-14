@@ -238,4 +238,41 @@ select pg_temp.as_user('bbbbbbbb-0000-0000-0000-000000000002');
 select pg_temp.denied('parent from another user/script is rejected', $$insert into public.script_versions (user_id, script_id, body, kind, parent_id) values ('bbbbbbbb-0000-0000-0000-000000000002','33333333-0000-0000-0000-0000000000bb','steal','edit','88888888-0000-0000-0000-000000000001')$$);
 reset role;
 
+-- Day 11: DNA tables.
+reset role;
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+insert into public.dna_collections (id, user_id, name) values ('d0000000-0000-0000-0000-00000000000a','aaaaaaaa-0000-0000-0000-000000000001','A collection');
+insert into public.dna_transcripts (id, user_id, collection_id, body, title, body_sha256) values ('d1000000-0000-0000-0000-00000000000a','aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a',repeat('word ',20),'T1','sha1');
+select pg_temp.denied_msg('duplicate transcript (same hash) is rejected', $$insert into public.dna_transcripts (user_id, collection_id, body, title, body_sha256) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a',repeat('word ',20),'T1 again','sha1')$$, 'no_dupes');
+select pg_temp.denied_msg('tiny transcript rejected', $$insert into public.dna_transcripts (user_id, collection_id, body, title, body_sha256) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a','short','T','sha2')$$, 'body_len');
+select pg_temp.denied_msg('huge transcript rejected', $$insert into public.dna_transcripts (user_id, collection_id, body, title, body_sha256) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a',repeat('x',100001),'T','sha3')$$, 'body_len');
+select pg_temp.denied_msg('bad finding label rejected', $$insert into public.dna_findings (user_id, collection_id, label, technique, evidence, sample_count) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a','PROVEN_VIRAL','x','[{"a":1}]',1)$$, 'label_check');
+select pg_temp.denied_msg('finding without evidence rejected', $$insert into public.dna_findings (user_id, collection_id, label, technique, evidence, sample_count) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a','CORE_PATTERN','x','[]',1)$$, 'evidence_check');
+insert into public.dna_findings (id, user_id, collection_id, label, technique, technique_key, evidence, sample_count) values ('d2000000-0000-0000-0000-00000000000a','aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a','UNVERIFIED_HYPOTHESIS','Hook','hook','[{"t":"x"}]',1);
+select pg_temp.denied_msg('one finding per technique per collection', $$insert into public.dna_findings (user_id, collection_id, label, technique, technique_key, evidence, sample_count) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a','CORE_PATTERN','Hook 2','hook','[{"t":"x"}]',1)$$, 'one_per_technique');
+select pg_temp.denied('user cannot write observations', $$insert into public.dna_observations (user_id, transcript_id, prompt_version, observations) values ('aaaaaaaa-0000-0000-0000-000000000001','d1000000-0000-0000-0000-00000000000a','v','[]')$$);
+select pg_temp.denied('user cannot create analyses', $$insert into public.dna_analyses (user_id, collection_id) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a')$$);
+reset role;
+insert into public.dna_analyses (user_id, collection_id, status) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a','queued');
+insert into public.dna_observations (user_id, transcript_id, prompt_version, observations) values ('aaaaaaaa-0000-0000-0000-000000000001','d1000000-0000-0000-0000-00000000000a','v1','[]');
+select pg_temp.denied_msg('only one active analysis per collection', $$insert into public.dna_analyses (user_id, collection_id, status) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a','running')$$, 'one_active');
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select pg_temp.check('owner reads own analyses and observations', (select count(*) from public.dna_analyses) = 1 and (select count(*) from public.dna_observations) = 1);
+select pg_temp.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select pg_temp.check('other user sees no DNA data at all', (select count(*) from public.dna_collections) + (select count(*) from public.dna_transcripts) + (select count(*) from public.dna_findings) + (select count(*) from public.dna_analyses) + (select count(*) from public.dna_observations) = 0);
+select pg_temp.denied('other user cannot add transcript to my collection', $$insert into public.dna_transcripts (user_id, collection_id, body, title) values ('bbbbbbbb-0000-0000-0000-000000000002','d0000000-0000-0000-0000-00000000000a',repeat('word ',20),'x')$$);
+select pg_temp.denied('other user cannot add finding to my collection', $$insert into public.dna_findings (user_id, collection_id, label, technique, evidence, sample_count) values ('bbbbbbbb-0000-0000-0000-000000000002','d0000000-0000-0000-0000-00000000000a','CORE_PATTERN','x','[{"a":1}]',1)$$);
+select pg_temp.denied('other user cannot edit my finding', $$update public.dna_findings set explanation='pwned' where id='d2000000-0000-0000-0000-00000000000a'$$);
+select pg_temp.denied('other user cannot delete my transcript', $$delete from public.dna_transcripts where id='d1000000-0000-0000-0000-00000000000a'$$);
+reset role;
+select pg_temp.check('victim data intact', (select count(*) from public.dna_transcripts where id='d1000000-0000-0000-0000-00000000000a') = 1 and (select count(*) from public.dna_findings where explanation='pwned') = 0);
+-- limits
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+insert into public.dna_transcripts (user_id, collection_id, body, title, body_sha256) select 'aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a',repeat('word ',20)||g,'T'||g,'h'||g from generate_series(1,29) g;
+select pg_temp.denied_msg('31st transcript in a collection is rejected', $$insert into public.dna_transcripts (user_id, collection_id, body, title, body_sha256) values ('aaaaaaaa-0000-0000-0000-000000000001','d0000000-0000-0000-0000-00000000000a',repeat('word ',20),'T31','h31')$$, 'transcript_limit_reached');
+insert into public.dna_collections (user_id, name) select 'aaaaaaaa-0000-0000-0000-000000000001','C'||g from generate_series(1,19) g;
+select pg_temp.denied_msg('21st collection is rejected', $$insert into public.dna_collections (user_id, name) values ('aaaaaaaa-0000-0000-0000-000000000001','C21')$$, 'collection_limit_reached');
+reset role;
+select pg_temp.denied('anon cannot read dna_analyses', $$select 1/0 from public.dna_analyses$$);
+
 select count(*) || ' checks passed' as summary from results where ok;
